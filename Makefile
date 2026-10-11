@@ -3,6 +3,7 @@ ROOT  := $(shell pwd)
 CORE  := services/core
 TOOLS := $(ROOT)/.tools/bin
 export PATH := $(TOOLS):$(PATH)
+LAMBDAS := $(filter api worker recon,$(notdir $(wildcard $(CORE)/cmd/*)))
 
 .PHONY: deps local-up local-down mock-bitgo core-local edge-dev web-dev \
         build-core test test-core test-edge test-web tf-validate policy robot
@@ -32,7 +33,7 @@ web-dev:
 
 # Lambda artifacts: linux/arm64, binary must be named "bootstrap" (provided.al2023).
 build-core:
-	@for fn in api worker recon; do \
+	@for fn in $(LAMBDAS); do \
 	  mkdir -p $(CORE)/bin/$$fn; \
 	  (cd $(CORE) && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" \
 	    -tags lambda.norpc -o bin/$$fn/bootstrap ./cmd/$$fn) || exit 1; \
