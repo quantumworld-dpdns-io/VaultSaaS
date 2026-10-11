@@ -236,3 +236,13 @@ func (t *Tx) TransfersBetween(from, to time.Time) ([]domain.Transfer, error) {
 	}
 	return out, rows.Err()
 }
+
+// ItemExists reports whether a finding was already raised in an earlier run,
+// so recurring runs do not repeat the same item.
+func (t *Tx) ItemExists(kind string, transfer, expected *uuid.UUID) (bool, error) {
+	var ok bool
+	err := t.tx.QueryRow(t.ctx, `SELECT EXISTS (SELECT 1 FROM app.reconciliation_items
+		WHERE kind = $1 AND transfer_id IS NOT DISTINCT FROM $2 AND expected_payment_id IS NOT DISTINCT FROM $3)`,
+		kind, transfer, expected).Scan(&ok)
+	return ok, err
+}
