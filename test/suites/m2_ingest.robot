@@ -18,7 +18,7 @@ ${WEBHOOK_URL}      ${EMPTY}
 *** Test Cases ***
 Go Tests Including Database Integration Pass
     Run And Expect Success
-    ...    VAULTOPS_TEST_DATABASE_URL='postgres://postgres:postgres@127.0.0.1:54322/postgres?sslmode=disable' go test ./...
+    ...    VAULTOPS_TEST_APP_PASSWORD='${APP_DB_PASSWORD}' VAULTOPS_TEST_DATABASE_URL='postgres://postgres:postgres@127.0.0.1:54322/postgres?sslmode=disable' go test ./...
     ...    cwd=${CORE_DIR}
 
 Edge Worker Tests Pass
@@ -101,17 +101,13 @@ Malformed Webhook Requests Are Refused At The Edge
 
 *** Keywords ***
 Start M2 Stack
-    Build Core Binaries
-    Start Postgres
-    Create Fresh Robot Database
+    Start Full Stack    fallback_token=${BITGO_TOKEN}
+    # vaultctl creates an org without a BitGo connection: the local-only
+    # BITGO_TOKEN fallback serves it, as before per-org connections existed.
     ${org}    ${token}=    Create Organization    Robot M2
     Set Suite Variable    ${ORG_ID}    ${org}
     Set Suite Variable    ${TOKEN}    ${token}
     Set Suite Variable    ${WEBHOOK_URL}    ${EDGE_URL}/webhooks/bitgo/${token}
-    Start ElasticMQ
-    Start Mock BitGo
-    Start Core    env:DATABASE_URL=${APP_DB_URL}    env:LOCAL_QUEUE_URL=${QUEUE_URL}
-    Start Edge
 
 Add Mock Transfer
     [Arguments]    ${wallet}    ${value}    ${state}    ${notify}=${False}

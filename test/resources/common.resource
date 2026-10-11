@@ -31,6 +31,12 @@ ${SQS_ENDPOINT}         http://127.0.0.1:9324
 ${QUEUE_URL}            ${SQS_ENDPOINT}/000000000000/vaultops-local-webhook-events
 ${DLQ_URL}              ${SQS_ENDPOINT}/000000000000/vaultops-local-webhook-events-dlq
 ${ELASTICMQ_JAR}        ${ROOT}/.tools/elasticmq-server-1.7.1.jar
+${AUTH_PORT}            18095
+${AUTH_URL}             http://127.0.0.1:${AUTH_PORT}
+${SIWE_DOMAIN}          127.0.0.1:${WEB_PORT}
+# test-only keyring: base64("0123456789abcdef0123456789abcdef")
+${TOKEN_ENC_KEYS}       1:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+${ANCHOR_DIR}           ${RESULTS}/anchors
 
 
 *** Keywords ***
@@ -45,7 +51,7 @@ Run And Expect Success
 
 Build Core Binaries
     Create Directory    ${BIN}
-    Run And Expect Success    go build -o ${BIN}/core-local ./cmd/local && go build -o ${BIN}/mockbitgo ./cmd/mockbitgo && go build -o ${BIN}/vaultctl ./cmd/vaultctl
+    Run And Expect Success    for c in local mockbitgo vaultctl mockauth devsign; do go build -o ${BIN}/$c ./cmd/$c || exit 1; done; mv ${BIN}/local ${BIN}/core-local
     ...    cwd=${CORE_DIR}
 
 Wait For Http
@@ -64,24 +70,27 @@ Start Mock BitGo
     Wait For Http    ${MOCK_URL}/__mock/requests
 
 Start Core
-    [Documentation]    Pass env:DATABASE_URL=... / env:LOCAL_QUEUE_URL=... to enable the worker.
-    [Arguments]    ${port}=${CORE_PORT}    ${token}=${BITGO_TOKEN}    ${alias}=core    &{extra_env}
+    [Documentation]    Core with database, SQS poller, token keyring and SIWE domain.
+    ...    The local-only BITGO_TOKEN fallback serves orgs without their own connection.
+    [Arguments]    ${port}=${CORE_PORT}    ${token}=${EMPTY}    ${alias}=core    &{extra_env}
     Start Process    ${BIN}/core-local    alias=${alias}    cwd=${ROOT}
     ...    env:CORE_ADDR=127.0.0.1:${port}    env:BITGO_BASE_URL=${MOCK_URL}    env:BITGO_TOKEN=${token}
-    ...    env:VAULTOPS_ENV=local    &{extra_env}
+    ...    env:VAULTOPS_ENV=local    env:DATABASE_URL=${APP_DB_URL}    env:TOKEN_ENC_KEYS=${TOKEN_ENC_KEYS}
+    ...    env:SIWE_DOMAIN=${SIWE_DOMAIN}    &{extra_env}
     ...    stdout=${RESULTS}/${alias}.log    stderr=STDOUT
     Wait For Http    http://127.0.0.1:${port}/healthz
 
 Start Edge
     Start Process    npx    wrangler    dev    --local    --ip    127.0.0.1    --port    ${EDGE_PORT}
     ...    --var    CORE_URL:${CORE_URL}    --var    ALLOWED_ORIGINS:${WEB_URL}    --var    SQS_QUEUE_URL:${QUEUE_URL}
+    ...    --var    SUPABASE_ISSUER:${AUTH_URL}/auth/v1    --var    SUPABASE_JWKS_URL:${AUTH_URL}/auth/v1/.well-known/jwks.json
     ...    alias=edge    cwd=${ROOT}/apps/edge
     ...    env:WRANGLER_SEND_METRICS=false    env:CI=1
     ...    stdout=${RESULTS}/edge.log    stderr=STDOUT
     Wait For Http    ${EDGE_URL}/healthz    timeout=120s
 
 Start Web
-    Run And Expect Success    npx tsc --noEmit && VITE_API_BASE=${EDGE_URL} npx vite build --outDir ${RESULTS}/web-dist --emptyOutDir
+    Run And Expect Success    npx tsc --noEmit && VITE_API_BASE=${EDGE_URL} VITE_AUTH_MODE=mock VITE_MOCK_AUTH_URL=${AUTH_URL} npx vite build --outDir ${RESULTS}/web-dist --emptyOutDir
     ...    cwd=${ROOT}/apps/web
     Start Process    npx    vite    preview    --outDir    ${RESULTS}/web-dist    --host    127.0.0.1
     ...    --port    ${WEB_PORT}    --strictPort
@@ -128,6 +137,62 @@ Queue Depth
     ${resp}=    POST    ${SQS_ENDPOINT}/    data=${{json.dumps($body)}}    headers=${headers}    expected_status=200
     ${a}=    Set Variable    ${resp.json()}[Attributes]
     RETURN    ${{int($a["ApproximateNumberOfMessages"]) + int($a["ApproximateNumberOfMessagesNotVisible"])}}
+
+Start Mock Auth
+    Start Process    ${BIN}/mockauth    alias=mockauth    cwd=${ROOT}
+    ...    env:MOCK_AUTH_ADDR=127.0.0.1:${AUTH_PORT}    env:MOCK_AUTH_DB_URL=${OWNER_DB_URL}
+    ...    stdout=${RESULTS}/mockauth.log    stderr=STDOUT
+    Wait For Http    ${AUTH_URL}/auth/v1/.well-known/jwks.json
+
+Start Full Stack
+    [Documentation]    Fresh database + every local stand-in, then core and edge (and the dashboard).
+    [Arguments]    ${with_web}=${False}    ${fallback_token}=${EMPTY}
+    Build Core Binaries
+    Start Postgres
+    Create Fresh Robot Database
+    Start ElasticMQ
+    Start Mock BitGo
+    Start Mock Auth
+    Start Core    token=${fallback_token}    env:LOCAL_QUEUE_URL=${QUEUE_URL}
+    Start Edge
+    IF    ${with_web}    Start Web
+
+Get Token
+    [Documentation]    Signs in through mockauth (creates the auth user) and returns the access token.
+    [Arguments]    ${email}
+    ${resp}=    POST    ${AUTH_URL}/__mock/token    json=${{{"email": $email}}}    expected_status=200
+    RETURN    ${resp.json()}[access_token]
+
+User Id Of
+    [Arguments]    ${email}
+    ${resp}=    POST    ${AUTH_URL}/__mock/token    json=${{{"email": $email}}}    expected_status=200
+    RETURN    ${resp.json()}[user][id]
+
+Api
+    [Documentation]    Calls the edge as a signed-in user; returns the response.
+    [Arguments]    ${method}    ${path}    ${token}    ${org}=${None}    ${body}=${None}    ${expected}=200
+    ...    &{extra_headers}
+    ${headers}=    Create Dictionary    Authorization=Bearer ${token}    &{extra_headers}
+    IF    $org is not None    Set To Dictionary    ${headers}    X-Org-Id=${org}
+    IF    '${method}' == 'GET'
+        ${resp}=    GET    ${EDGE_URL}${path}    headers=${headers}    expected_status=${expected}
+    ELSE IF    '${method}' == 'POST'
+        ${resp}=    POST    ${EDGE_URL}${path}    headers=${headers}    json=${body}    expected_status=${expected}
+    ELSE
+        ${resp}=    PUT    ${EDGE_URL}${path}    headers=${headers}    json=${body}    expected_status=${expected}
+    END
+    RETURN    ${resp}
+
+Create Org Via Api
+    [Documentation]    Returns (org_id, webhook_token).
+    [Arguments]    ${token}    ${name}
+    ${resp}=    Api    POST    /api/v1/orgs    ${token}    body=${{{"name": $name}}}    expected=201
+    RETURN    ${resp.json()}[id]    ${resp.json()}[webhookToken]
+
+Connect BitGo
+    [Arguments]    ${token}    ${org}
+    ${resp}=    Api    PUT    /api/v1/org/bitgo-connection    ${token}    ${org}    body=${{{"token": $BITGO_TOKEN, "enterpriseId": "ent_demo"}}}
+    RETURN    ${resp}
 
 Reset Mock BitGo
     POST    ${MOCK_URL}/__mock/reset    expected_status=200

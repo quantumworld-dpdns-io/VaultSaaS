@@ -39,10 +39,13 @@ Core Health Check Is Reachable End To End Through The Edge
     Should Be Equal    ${resp.headers}[cache-control]    no-store
 
 Wallets Are Listed With String Balances Through The Edge
-    ${resp}=    GET    ${EDGE_URL}/api/v1/wallets    expected_status=200
+    ${token}=    Get Token    m1-api@example.com
+    ${org}    ${_}=    Create Org Via Api    ${token}    M1 API Org
+    Connect BitGo    ${token}    ${org}
+    ${resp}=    Api    GET    /api/v1/wallets    ${token}    ${org}
     ${wallets}=    Set Variable    ${resp.json()}[wallets]
     Length Should Be    ${wallets}    2
-    Should Be Equal    ${wallets}[0][id]    wlt_btc_ops
+    Should Be Equal    ${wallets}[0][providerWalletId]    wlt_btc_ops
     Should Be Equal    ${wallets}[0][balance]    150000000
     Should Be Equal    ${wallets}[1][balance]    2500000000000000000
     Should Be String    ${wallets}[1][balance]
@@ -54,14 +57,28 @@ Core Uses The BitGo Token And Only Read Endpoints
     END
 
 Upstream BitGo Errors Are Not Leaked
-    Start Core    port=18081    token=wrong-token    alias=core_badtoken
-    ${resp}=    GET    http://127.0.0.1:18081/v1/wallets    expected_status=502
+    ${token}=    Get Token    m1-outage@example.com
+    ${org}    ${_}=    Create Org Via Api    ${token}    M1 Outage Org
+    Connect BitGo    ${token}    ${org}
+    POST    ${MOCK_URL}/__mock/fail    json=${{{"Count": 10}}}
+    ${resp}=    Api    GET    /api/v1/wallets    ${token}    ${org}    expected=502
     Should Be Equal    ${resp.text.strip()}    {"error":"bitgo_unavailable"}
-    [Teardown]    Terminate Process    core_badtoken    kill=True
+    [Teardown]    POST    ${MOCK_URL}/__mock/fail    json=${{{"Count": 0}}}
 
 Dashboard Lists Testnet Wallets And Balances
-    [Documentation]    The M1 acceptance criterion.
+    [Documentation]    The M1 acceptance criterion, through the UI: sign in, create an org,
+    ...    connect BitGo, see wallets and balances.
     Open Browser    ${WEB_URL}/    headlesschrome
+    Wait Until Element Is Visible    css:[data-testid="login-email"]    timeout=20s
+    Input Text    css:[data-testid="login-email"]    m1-ui@example.com
+    Click Button    css:[data-testid="login-submit"]
+    Wait Until Element Is Visible    css:[data-testid="org-name"]    timeout=20s
+    Input Text    css:[data-testid="org-name"]    M1 UI Org
+    Click Button    css:[data-testid="org-create"]
+    Wait Until Element Is Visible    css:[data-testid="webhook-url"]    timeout=20s
+    Wait Until Element Is Visible    css:[data-testid="bitgo-token"]    timeout=20s
+    Input Text    css:[data-testid="bitgo-token"]    ${BITGO_TOKEN}
+    Click Button    css:[data-testid="connect-submit"]
     Wait Until Element Is Visible    css:[data-testid="wallets-table"]    timeout=20s
     Element Should Contain    css:[data-testid="wallet-wlt_btc_ops"]    BTC Operations
     Element Should Contain    css:[data-testid="wallet-wlt_btc_ops"] [data-testid="balance"]    1.5
@@ -72,8 +89,4 @@ Dashboard Lists Testnet Wallets And Balances
 
 *** Keywords ***
 Start M1 Stack
-    Build Core Binaries
-    Start Mock BitGo
-    Start Core
-    Start Edge
-    Start Web
+    Start Full Stack    with_web=${True}

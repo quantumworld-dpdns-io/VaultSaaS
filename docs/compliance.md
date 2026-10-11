@@ -52,3 +52,24 @@ Manual review:
   - hand-written pgx SQL instead of sqlc (plan updated);
   - ElasticMQ runs from its jar locally because the Docker Desktop proxy blocks image pulls. The compose service is kept for machines where pulls work.
 - **Open:** BitGo webhook signature verification is a TODO until Week 0 confirms BitGo's mechanism. Meanwhile, the unguessable per-tenant token plus mandatory re-fetch is the control.
+
+## M3 — Tenancy, Auth, RBAC, Audit (2026-10-11)
+
+Result: **M3 suite 12/12, M1 11/11, M2 10/10, compliance (m1–m3) 18/18 — 51/51.**
+
+Acceptance evidence:
+- **BOLA/IDOR** — through the edge, Alice gets the same `403 forbidden` for Bob's org and for a random org id on wallets, transfers, alerts, audit, members, invitations and bitgo-connection. Client-supplied `X-Vaultops-*` headers are dropped by the edge. At the DB layer (Go tests), RLS hides and refuses foreign rows.
+- **Audit immutability** — `UPDATE`/`DELETE`/`TRUNCATE` on `app.audit_logs` are rejected by trigger, even as the owner. A rewrite that recomputes the whole chain still verifies internally, but the daily R2 anchor flags it (`audit_anchor_mismatch`, critical).
+
+Manual review:
+- **P0 / D2** — only additions are an EventBridge schedule and two SSM Standard SecureString shells (R2 credentials). Policy passes on both environments. Audit anchors use Cloudflare R2, not S3.
+- **P1** — ledger writes still only via the Go domain service; the new API writes membership/connection/audit rows through `store.InOrgAs`.
+- **P3** — RLS on every `app` table (`TestEveryTenantTableHasRLS`). The runtime role is neither superuser nor BYPASSRLS. Cross-tenant entry points are narrow SECURITY DEFINER functions.
+- **P4** — `supabase/config.toml` exposes `public` only. `anon`/`authenticated` have no USAGE on `app`. Member emails come through `app.current_org_members()`, not a grant on `auth.users`.
+- **P5** — the browser holds only the Supabase anon key (public by design) and the user's access token. BitGo tokens are AES-256-GCM sealed and bound to the org id.
+- **D3** — Supabase Auth JWTs (JWKS, ES256/RS256); locally `cmd/mockauth` issues Supabase-shaped tokens.
+- **D4** — wallets are linked identities only: no wallet sign-in/sign-up route, Supabase Web3 sign-in disabled, linking requires a signed-in user plus a single-use nonce, and one address maps to one user.
+  - *Deviation:* the plan said "Supabase Web3 identity linking"; VaultOps verifies EIP-4361 itself and keeps Supabase Web3 off, which enforces D4 more strictly.
+- **D5** — no new BitGo write paths. Connecting BitGo is verified with a read-only `ListWallets`.
+- **Tenant isolation fix** — the shared `BITGO_TOKEN` is now refused outside `local`, so each org must use its own connection. Without this, all tenants would have seen the same wallets.
+- **Bug found by the M3 suite:** the local anchor store silently skipped earlier anchors when its root path contained `..` (fixed in `0102e11`; regression test added). R2 itself is unaffected (key listing).
