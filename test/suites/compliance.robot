@@ -98,6 +98,20 @@ P5 Reports Neutralise Spreadsheet Formula Injection
     [Tags]    p5    m4
     Run And Expect Success    go test -count=1 ./internal/report/ -run TestSafeCell    cwd=${CORE_DIR}
 
+D5 Alert Rules Never Call BitGo
+    [Tags]    d5    m5
+    No Match In Repo    bitgo\\.New|\\.ListWallets|\\.GetTransfer|\\.ListTransfers|http\\.    services/core/internal/rules --include=*.go --exclude=*_test.go
+
+P0 · P5 Security Scanners Are Clean (gosec, govulncheck, semgrep, trivy, tflint, actionlint)
+    [Tags]    p0    p5    m5
+    Run And Expect Success    go run github.com/securego/gosec/v2/cmd/gosec@v2.29.0 -quiet ./... && go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+    ...    cwd=${CORE_DIR}    timeout=900s
+    Run And Expect Success    SEMGREP_SEND_METRICS=off ${CURDIR}/../.venv/bin/semgrep scan --config p/golang --config p/typescript --config p/secrets --config p/terraform --metrics=off --quiet --error services apps infra
+    ...    timeout=900s
+    Run And Expect Success    .tools/bin/trivy config --quiet --exit-code 1 --severity HIGH,CRITICAL --skip-dirs '**/.terraform' --ignorefile infra/.trivyignore infra
+    Run And Expect Success    for d in infra/bootstrap infra/envs/dev infra/envs/prod infra/modules/*; do .tools/bin/tflint --chdir="$d" --minimum-failure-severity=warning || exit 1; done
+    Run And Expect Success    .tools/bin/actionlint -shellcheck= .github/workflows/*.yml
+
 D6 Infrastructure Lives In Tokyo / APAC
     [Tags]    d6    m1
     ${regions}=    Run And Expect Success    grep -rhoE 'region\\s*=\\s*"[a-z0-9-]+"' infra --include=*.tf | grep -v '"auto"' | sort -u

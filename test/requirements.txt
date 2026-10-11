@@ -1,3 +1,4 @@
 robotframework==7.5
 robotframework-requests==0.9.7
 robotframework-seleniumlibrary==6.9.0
+semgrep==1.180.0

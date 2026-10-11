@@ -86,7 +86,7 @@ Sign in with any email. Create an organization, then connect BitGo with the toke
 | Milestone | State |
 |---|---|
 | M1 Foundation · M2 Ingest · M3 Tenancy/Auth/Audit · M4 Reconciliation | ✅ done, Robot-verified |
-| M5 Security alerts & demo | 🚧 in progress |
+| M5 Security alerts & demo | ✅ done, Robot-verified (demo video still to be recorded) |
 | Week 0 (BitGo account, cloud accounts, `terraform apply`) | ⏳ needs real credentials |
 | Phase 2 (approvals, billing) | ⏳ gated by Go/No-Go |
 

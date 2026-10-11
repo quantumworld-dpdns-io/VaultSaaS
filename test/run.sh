@@ -12,8 +12,8 @@ fi
 .venv/bin/pip install -q -r requirements.txt
 export PATH="$(cd .. && pwd)/.tools/bin:$PATH"
 export WRANGLER_SEND_METRICS=false
-args=("$@")
-targets=()
-for a in "${args[@]}"; do [[ "$a" == *.robot ]] && targets+=("$a"); done
-if [[ ${#targets[@]} -eq 0 ]]; then args+=(suites); fi
-exec .venv/bin/robot --outputdir results --loglevel INFO "${args[@]}"
+# Default to every suite unless specific .robot files were given.
+has_target=false
+for a in "$@"; do [[ "$a" == *.robot ]] && has_target=true; done
+if ! $has_target; then set -- "$@" suites; fi
+exec .venv/bin/robot --outputdir results --loglevel INFO "$@"

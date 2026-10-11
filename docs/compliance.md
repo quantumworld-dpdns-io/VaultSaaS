@@ -101,3 +101,19 @@ Manual review:
 - **D6** — report day boundaries use Asia/Taipei.
 - **Plan extension:** a sixth finding kind, `missed_webhook`, separates "ledger gap" from the plan's `missing_internal` (unexpected inbound). Recorded in the plan.
 - **Test-environment note:** headless Chrome could not read upload files under `~/Documents` (macOS privacy controls), so the UI test writes its CSV to the system temp dir.
+
+## M5 — Security Alerts & Demo (2026-10-11)
+
+Result: **M5 end-to-end suite 8/8; full run of every suite 73/73** (compliance 23, M1 11, M2 10, M3 12, M4 9, M5 8).
+
+Acceptance evidence (`make demo`, mock BitGo): testnet deposit → webhook → SQS → BitGo re-fetch → booked; large send to a new address → `large_transfer` + `new_destination`; policy changed at BitGo → `wallet_policy_changed`; a lost webhook is backfilled and matched by reconciliation, and an underpayment is flagged; a BitGo outage → 3 messages in the DLQ → scheduled rules raise `dlq_backlog` and `bitgo_token_expiring`; the daily report contains the day's transfers and findings; the audit chain verifies; an alert is resolved from the dashboard.
+
+Manual review:
+- **P0 / D2** — no new AWS resource types. SNS encryption and X-Ray active tracing stay off because both are billed; the suppressions are documented in `infra/.trivyignore` and in the Terraform source. Policy, trivy and tflint are clean.
+- **P1** — rules only raise alerts and record known destinations / policy hashes; ledger state still changes only through the domain service.
+- **P3** — `alert_settings` and `known_destinations` carry `organization_id` with RLS. Resolving another tenant's alert returns 404.
+- **P5** — the scanner gate is clean: gosec, govulncheck, semgrep (Go/TS/Terraform/secrets), npm audit, trivy, tflint, actionlint. The local object store refuses path traversal.
+- **D5** — the rules package never calls BitGo; it only reads data the worker and reconciliation already fetched.
+- **D6** — DLQ and token rules use 24 h / day windows; reports stay on Asia/Taipei days.
+- **Found and fixed by this milestone's tooling:** an unquoted `:` that made `ci.yml` invalid YAML (actionlint); an unused Terraform data source (tflint); a runbook line that would have minted an extra IAM key; `test/run.sh` failing with no arguments.
+- **Not done:** the recorded demo video (needs a human; `make demo` produces step screenshots). Real BitGo testnet and cloud deployment remain Week 0 items.
