@@ -89,7 +89,7 @@ VaultSaaS/
 │   ├── cmd/recon/           # Lambda: scheduled reconciliation
 │   ├── internal/domain/     # 狀態機、對帳、審批規則（唯一寫入邏輯）
 │   ├── internal/bitgo/      # BitGo REST client（重試、限流、錯誤分類）
-│   ├── internal/store/      # pgx + sqlc，RLS session 設定
+│   ├── internal/store/      # pgx（手寫 SQL，未採 sqlc），RLS session 設定
 │   ├── internal/crypto/     # token 信封加密
 │   └── internal/authz/      # RBAC
 ├── db/migrations/           # SQL migrations（supabase CLI 或 goose）
@@ -341,6 +341,6 @@ user_wallets               (user_id, chain, address, verified_at)  -- SIWE 連�
 ## 11. 尚待決定（不阻擋 M1）
 
 - [ ] 前端是否需要 SSR／SEO 行銷頁（目前：Vite SPA + 另以靜態頁做 landing）。
-- [ ] Migrations 工具：supabase CLI vs goose（傾向 goose，與 Go 一致）。
+- [x] Migrations 工具：goose（`vaultctl migrate`，版本表放在非公開 schema `vaultops_meta`）。
 - [ ] 計費 MoR 選擇（Paddle vs Lemon Squeezy vs ECPay）— Phase 2 前決定。
 - [ ] 第二條鏈的 wallet login（Solana）— 視客戶訪談需求。

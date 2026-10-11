@@ -22,6 +22,15 @@ ${MOCK_URL}             http://127.0.0.1:${MOCK_PORT}
 ${CORE_URL}             http://127.0.0.1:${CORE_PORT}
 ${EDGE_URL}             http://127.0.0.1:${EDGE_PORT}
 ${WEB_URL}              http://127.0.0.1:${WEB_PORT}
+${COMPOSE}              docker compose -f ${ROOT}/docker-compose.local.yml
+${ROBOT_DB}             vaultops_robot
+${OWNER_DB_URL}         postgres://postgres:postgres@127.0.0.1:54322/${ROBOT_DB}?sslmode=disable
+${APP_DB_PASSWORD}      robot-app-password-123
+${APP_DB_URL}           postgres://vaultops_app:${APP_DB_PASSWORD}@127.0.0.1:54322/${ROBOT_DB}?sslmode=disable
+${SQS_ENDPOINT}         http://127.0.0.1:9324
+${QUEUE_URL}            ${SQS_ENDPOINT}/000000000000/vaultops-local-webhook-events
+${DLQ_URL}              ${SQS_ENDPOINT}/000000000000/vaultops-local-webhook-events-dlq
+${ELASTICMQ_JAR}        ${ROOT}/.tools/elasticmq-server-1.7.1.jar
 
 
 *** Keywords ***
@@ -36,7 +45,7 @@ Run And Expect Success
 
 Build Core Binaries
     Create Directory    ${BIN}
-    Run And Expect Success    go build -o ${BIN}/core-local ./cmd/local && go build -o ${BIN}/mockbitgo ./cmd/mockbitgo
+    Run And Expect Success    go build -o ${BIN}/core-local ./cmd/local && go build -o ${BIN}/mockbitgo ./cmd/mockbitgo && go build -o ${BIN}/vaultctl ./cmd/vaultctl
     ...    cwd=${CORE_DIR}
 
 Wait For Http
@@ -55,6 +64,7 @@ Start Mock BitGo
     Wait For Http    ${MOCK_URL}/__mock/requests
 
 Start Core
+    [Documentation]    Pass env:DATABASE_URL=... / env:LOCAL_QUEUE_URL=... to enable the worker.
     [Arguments]    ${port}=${CORE_PORT}    ${token}=${BITGO_TOKEN}    ${alias}=core    &{extra_env}
     Start Process    ${BIN}/core-local    alias=${alias}    cwd=${ROOT}
     ...    env:CORE_ADDR=127.0.0.1:${port}    env:BITGO_BASE_URL=${MOCK_URL}    env:BITGO_TOKEN=${token}
@@ -64,7 +74,7 @@ Start Core
 
 Start Edge
     Start Process    npx    wrangler    dev    --local    --ip    127.0.0.1    --port    ${EDGE_PORT}
-    ...    --var    CORE_URL:${CORE_URL}    --var    ALLOWED_ORIGINS:${WEB_URL}
+    ...    --var    CORE_URL:${CORE_URL}    --var    ALLOWED_ORIGINS:${WEB_URL}    --var    SQS_QUEUE_URL:${QUEUE_URL}
     ...    alias=edge    cwd=${ROOT}/apps/edge
     ...    env:WRANGLER_SEND_METRICS=false    env:CI=1
     ...    stdout=${RESULTS}/edge.log    stderr=STDOUT
@@ -78,6 +88,46 @@ Start Web
     ...    alias=web    cwd=${ROOT}/apps/web
     ...    stdout=${RESULTS}/web.log    stderr=STDOUT
     Wait For Http    ${WEB_URL}/
+
+Start Postgres
+    Run And Expect Success    ${COMPOSE} up -d --wait postgres    timeout=180s
+
+Psql
+    [Documentation]    Runs SQL as the owner inside the postgres container; returns trimmed output.
+    [Arguments]    ${sql}    ${db}=${ROBOT_DB}
+    ${r}=    Run Process    ${COMPOSE} exec -T postgres psql -U postgres -d ${db} -v ON_ERROR_STOP\=1 -tAc "${sql}"
+    ...    shell=True    stderr=STDOUT
+    Should Be Equal As Integers    ${r.rc}    0    msg=psql failed: ${r.stdout}
+    RETURN    ${r.stdout.strip()}
+
+Create Fresh Robot Database
+    Psql    DROP DATABASE IF EXISTS ${ROBOT_DB} WITH (FORCE)    db=postgres
+    Psql    CREATE DATABASE ${ROBOT_DB}    db=postgres
+    Run And Expect Success    ${COMPOSE} exec -T postgres psql -U postgres -d ${ROBOT_DB} -v ON_ERROR_STOP=1 -q -f /docker-entrypoint-initdb.d/00_supabase_stub.sql
+    Run And Expect Success    DATABASE_OWNER_URL='${OWNER_DB_URL}' VAULTOPS_APP_DB_PASSWORD='${APP_DB_PASSWORD}' ${BIN}/vaultctl migrate --dir db/migrations --set-app-password
+
+Create Organization
+    [Documentation]    Returns (org_id, webhook_token).
+    [Arguments]    ${name}
+    ${out}=    Run And Expect Success    DATABASE_URL='${APP_DB_URL}' ${BIN}/vaultctl org-create --name '${name}'
+    ${org}=    Get Regexp Matches    ${out}    org_id=(\\S+)    1
+    ${token}=    Get Regexp Matches    ${out}    webhook_token=(\\S+)    1
+    RETURN    ${org}[0]    ${token}[0]
+
+Start ElasticMQ
+    File Should Exist    ${ELASTICMQ_JAR}    Run `make tools` to download ElasticMQ.
+    Start Process    java    -Dconfig.file\=${ROOT}/db/local/elasticmq.conf    -jar    ${ELASTICMQ_JAR}
+    ...    alias=elasticmq    cwd=${ROOT}    stdout=${RESULTS}/elasticmq.log    stderr=STDOUT
+    Wait For Http    ${SQS_ENDPOINT}/?Action=ListQueues
+
+Queue Depth
+    [Documentation]    Visible + in-flight messages on a queue.
+    [Arguments]    ${queue_url}
+    ${body}=    Create Dictionary    QueueUrl=${queue_url}    AttributeNames=${{["All"]}}
+    ${headers}=    Create Dictionary    X-Amz-Target=AmazonSQS.GetQueueAttributes    Content-Type=application/x-amz-json-1.0
+    ${resp}=    POST    ${SQS_ENDPOINT}/    data=${{json.dumps($body)}}    headers=${headers}    expected_status=200
+    ${a}=    Set Variable    ${resp.json()}[Attributes]
+    RETURN    ${{int($a["ApproximateNumberOfMessages"]) + int($a["ApproximateNumberOfMessagesNotVisible"])}}
 
 Reset Mock BitGo
     POST    ${MOCK_URL}/__mock/reset    expected_status=200

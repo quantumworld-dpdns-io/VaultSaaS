@@ -32,3 +32,23 @@ Manual review:
   - The edge IAM user also has `lambda:InvokeFunction` on the same function (needed for Function URLs since late 2025).
   - SNS topic + email subscription (Always Free: 1,000 emails/month) added so CloudWatch alarms can notify someone; alarms are capped at 5 per environment so dev + prod stay within the free 10.
 - **Not verified here:** `terraform apply` against real AWS/Cloudflare accounts, and R2 support for `use_lockfile`. Both need credentials (Week 0).
+
+## M2 — Ingest pipeline (2026-10-11)
+
+Result: **M2 suite 10/10, M1 regression 11/11, compliance (m1+m2) 15/15 — 36/36.**
+
+Acceptance evidence:
+- One webhook replayed 10 times via `vaultctl replay` → `webhook_events.attempts = 10`, one `transfers` row, one `transfer.booked` audit entry.
+- BitGo lookups forced to fail → the message reaches the DLQ after 5 receives; the event is `failed:5`, nothing is booked, and a `webhook_dead_lettered` security alert exists.
+
+Manual review:
+- **P1** — the edge only validates and enqueues; every ledger write goes through `domain.ApplyObservation` inside `store.InOrg`.
+- **P2** — the worker books state/amount only from `GET …/transfer/{id}`. A body that claims `confirmed` with a larger amount is booked as BitGo's `pending`/`100`. Forged transfer IDs are rejected with an alert.
+- **P3** — every tenant table has `organization_id NOT NULL`, and all access sets `app.org_id`. RLS policies themselves land in M3, as the plan schedules.
+- **P4** — tenant tables live in schema `app`; goose's version table lives in the private `vaultops_meta` schema instead of `public`.
+- **D3** — Postgres only; pgx in exec mode, compatible with the Supavisor transaction pooler.
+- **D5** — the worker uses GET endpoints only (D5 guard tests unchanged).
+- **Deviations:**
+  - hand-written pgx SQL instead of sqlc (plan updated);
+  - ElasticMQ runs from its jar locally because the Docker Desktop proxy blocks image pulls. The compose service is kept for machines where pulls work.
+- **Open:** BitGo webhook signature verification is a TODO until Week 0 confirms BitGo's mechanism. Meanwhile, the unguessable per-tenant token plus mandatory re-fetch is the control.
