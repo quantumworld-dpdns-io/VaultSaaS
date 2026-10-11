@@ -1,0 +1,15 @@
+# Terraform state lives in Cloudflare R2 (S3 is not Always Free — principle 0).
+#
+#   cp backend.r2.hcl.example backend.r2.hcl.local   # *.local is gitignored
+#   terraform -chdir=envs/dev init -backend-config=../../backend.r2.hcl.local
+#
+# The bucket is created once by hand:  wrangler r2 bucket create vaultops-tfstate
+# Credentials: an R2 API token scoped to that bucket only, stored as a named
+# profile so it never collides with the AWS provider's credentials:
+#   ~/.aws/credentials
+#   [vaultops-r2]
+#   aws_access_key_id     = <R2 access key id>
+#   aws_secret_access_key = <R2 secret>
+bucket    = "vaultops-tfstate"
+profile   = "vaultops-r2"
+endpoints = { s3 = "https://<CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com" }
