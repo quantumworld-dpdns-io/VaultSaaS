@@ -252,22 +252,37 @@ user_wallets               (user_id, chain, address, verified_at)  -- SIWE 連�
 - [ ] Terraform 前置：安裝 Terraform ≥ 1.10、`wrangler r2 bucket create vaultops-tfstate`、建立 R2 / Cloudflare scoped API tokens、驗證 R2 對 `use_lockfile` 的支援。
 - [ ] 副線：列出 15 個台灣／APAC 潛在客戶名單（Web3 團隊、有穩定幣收款的 SaaS、OTC desk），寄出訪談邀請。
 
-### M1 — Foundation（第 1–2 週，~20h）
-- monorepo 骨架；Terraform `bootstrap`（GitHub OIDC + CI roles）→ `envs/dev` 套用 `aws-core`、`aws-edge-access`、`cloudflare-edge`（R2 backend）。
-- `infra-plan` workflow + 原則 0 conftest 守門上線（之後所有 infra 變更都經此檢查）。
-- Go `api` Lambda + Function URL；Worker 以 SigV4 呼叫；`/healthz` 端到端通。
-- `internal/bitgo` client：list wallets / get transfer（testnet）。
-- **驗收**：Dashboard 雛形能列出 testnet 錢包與餘額。
+### M1 — Foundation（第 1–2 週，~20h）— ✅ 完成（本機驗收；實際部署待 Week 0 憑證）
+- [x] monorepo 骨架 — `30c0228`
+- [x] Go `api` Lambda + Function URL adapter、SSM config、`/healthz` — `95d76af`
+- [x] `internal/bitgo` 唯讀 client（D5 guard）+ mock BitGo + `GET /v1/wallets` — `15d919b`
+- [x] Edge Worker 以 SigV4 呼叫 core — `e593b5d`
+- [x] Dashboard 雛形（錢包與餘額）— `eb69472`
+- [x] Terraform `bootstrap`（GitHub OIDC + CI roles）— `99f33ab`
+- [x] Terraform `aws-core`、`aws-edge-access`、`cloudflare-edge`、`envs/dev|prod`（R2 backend）— `d4b7daa`
+- [x] 原則 0 conftest 守門 + `infra-plan` 等 workflows — `92209f1`
+- [x] Robot M1 驗收 + compliance 套件（11/11、12/12）— `a546792`
+- [ ] `terraform apply` 到真實 AWS / Cloudflare（需 Week 0 帳號與憑證）
+- **驗收**：Dashboard 雛形能列出 testnet 錢包與餘額。（以 mock BitGo 通過；真實 testnet 待 Week 0）
 
-### M2 — Ingest Pipeline（第 3–5 週，~30h）
-- Webhook 入口 → SQS → worker → Postgres；DLQ + alarm。
-- transfers 狀態機與單元測試；webhook replay 工具（重送錄製的 payload）。
-- **驗收**：同一 webhook 重送 10 次只入帳一次；故意讓 BitGo 查詢失敗會進 DLQ 並產生 alert。
+### M2 — Ingest Pipeline（第 3–5 週，~30h）— ✅ 完成
+- [x] transfers 狀態機與單元測試 — `4cd76a3`
+- [x] `app` schema migrations、pgx store、`vaultctl`（含 webhook replay 工具）— `36d0757`
+- [x] SQS worker：重新查詢 BitGo、去重、DLQ 前告警 — `2c85da6`
+- [x] Edge webhook 入口 → SQS — `90bf454`
+- [x] CI：Postgres 測試服務、部署前 migration — `8738c58`
+- [x] Robot M2 驗收（10/10）+ compliance（M1+M2 共 36/36）— `f5440d4`
+- **驗收**：同一 webhook 重送 10 次只入帳一次；故意讓 BitGo 查詢失敗會進 DLQ 並產生 alert。✅
 
-### M3 — Tenancy, Auth, RBAC, Audit（第 6–7 週，~20h）
-- Supabase Auth + 邀請流程 + SIWE 連結錢包。
-- RLS policies + Go authz；audit hash chain + 每日 R2 錨點。
-- **驗收**：跨租戶存取整合測試（BOLA/IDOR 案例）全數被拒；修改 audit_logs 被 trigger 拒絕。
+### M3 — Tenancy, Auth, RBAC, Audit（第 6–7 週，~20h）— 🚧 進行中
+- [x] 成員、邀請、所有 `app` 表 RLS、audit hash chain + append-only trigger — `4f789ac`
+- [x] 每租戶 BitGo 連線（AES-256-GCM 加密，移除共用 token）— `aa515e3`
+- [x] Go authz（RBAC）+ org API + SIWE 連結錢包（D4：僅連結身分）— `54ce433`
+- [ ] Edge 驗證 Supabase JWT（JWKS）並轉送身分；`supabase/config.toml`（Data API 只暴露 `public`、停用 web3 登入）
+- [ ] 每日 R2 audit 錨點（`recon` Lambda `audit_anchor` 任務 + 排程）
+- [ ] Dashboard 登入、組織切換、連結錢包
+- [ ] Robot M3 驗收 + compliance；M1/M2 套件改為帶身分呼叫
+- **驗收**：跨租戶存取整合測試（BOLA/IDOR 案例）全數被拒；修改 audit_logs 被 trigger 拒絕。（Go 層已通過；Robot 待補）
 
 ### M4 — Reconciliation & Reporting（第 8–10 週，~30h）
 - `recon` 排程、expected_payments CSV 匯入、差異分類、每日報表到 R2。
