@@ -82,3 +82,16 @@ func TestDirRefusesOverwrite(t *testing.T) {
 		t.Fatal("anchors must be write-once")
 	}
 }
+
+func TestDirListHandlesUncleanRoot(t *testing.T) {
+	base := t.TempDir()
+	d := anchor.Dir{Root: base + "/sub/../anchors"}
+	ctx := context.Background()
+	if err := d.Put(ctx, "anchors/org/a.json", []byte("1")); err != nil {
+		t.Fatal(err)
+	}
+	keys, err := d.List(ctx, "anchors/org/")
+	if err != nil || len(keys) != 1 || keys[0] != "anchors/org/a.json" {
+		t.Fatalf("list with a non-clean root: %v %v", keys, err)
+	}
+}

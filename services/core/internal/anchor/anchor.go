@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -138,4 +139,6 @@ func (a *Anchorer) alert(ctx context.Context, org uuid.UUID, kind, msg string, d
 // Dir is a local ObjectStore for development and tests.
 type Dir struct{ Root string }
 
-func (d Dir) path(key string) string { return d.Root + "/" + strings.TrimPrefix(key, "/") }
+func (d Dir) path(key string) string {
+	return filepath.Join(d.Root, filepath.FromSlash(strings.TrimPrefix(key, "/")))
+}

@@ -18,7 +18,14 @@ import (
 	"github.com/vaultops/core/internal/store"
 )
 
-const appPassword = "storetest-app-password"
+// appPassword sets the cluster-wide vaultops_app password. Suites that also
+// run a live stack against the same server pass theirs so neither breaks.
+var appPassword = func() string {
+	if p := os.Getenv("VAULTOPS_TEST_APP_PASSWORD"); p != "" {
+		return p
+	}
+	return "storetest-app-password"
+}()
 
 // RepoRoot returns the repository root (for db/migrations).
 func RepoRoot() string {

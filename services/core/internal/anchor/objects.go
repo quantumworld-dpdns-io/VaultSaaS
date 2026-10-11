@@ -36,7 +36,9 @@ func (d Dir) Get(_ context.Context, key string) ([]byte, error) { return os.Read
 
 func (d Dir) List(_ context.Context, prefix string) ([]string, error) {
 	var keys []string
-	err := filepath.WalkDir(d.Root, func(p string, e fs.DirEntry, err error) error {
+	// WalkDir yields cleaned paths, so the root must be cleaned too.
+	root := filepath.Clean(d.Root)
+	err := filepath.WalkDir(root, func(p string, e fs.DirEntry, err error) error {
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				return filepath.SkipAll
@@ -46,7 +48,11 @@ func (d Dir) List(_ context.Context, prefix string) ([]string, error) {
 		if e.IsDir() {
 			return nil
 		}
-		k := strings.TrimPrefix(filepath.ToSlash(strings.TrimPrefix(p, d.Root)), "/")
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		k := filepath.ToSlash(rel)
 		if strings.HasPrefix(k, prefix) {
 			keys = append(keys, k)
 		}
