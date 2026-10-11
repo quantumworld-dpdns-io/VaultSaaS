@@ -7,9 +7,13 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/vaultops/core/internal/bitgo"
 	"github.com/vaultops/core/internal/config"
+	"github.com/vaultops/core/internal/connections"
+	"github.com/vaultops/core/internal/crypto"
 	"github.com/vaultops/core/internal/httpapi"
+	"github.com/vaultops/core/internal/identity"
 	"github.com/vaultops/core/internal/ingest"
 	"github.com/vaultops/core/internal/store"
 )
@@ -20,7 +24,8 @@ type App struct {
 	BitGo  *bitgo.Client
 	Store  *store.Store // nil when DATABASE_URL is not configured
 	HTTP   http.Handler
-	Ingest *ingest.Processor // nil without a store
+	Conns  *connections.Resolver // nil without a store
+	Ingest *ingest.Processor     // nil without a store
 }
 
 func New(ctx context.Context, log *slog.Logger) (*App, error) {
@@ -28,14 +33,28 @@ func New(ctx context.Context, log *slog.Logger) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	bg := bitgo.New(cfg.BitGoBaseURL, cfg.BitGoToken)
-	a := &App{Config: cfg, Log: log, BitGo: bg}
+	a := &App{Config: cfg, Log: log}
+	if cfg.BitGoToken != "" { // local only (enforced by config)
+		a.BitGo = bitgo.New(cfg.BitGoBaseURL, cfg.BitGoToken)
+	}
+	var kr *crypto.Keyring
+	if cfg.TokenEncKeys != "" {
+		if kr, err = crypto.ParseKeyring(cfg.TokenEncKeys); err != nil {
+			return nil, err
+		}
+	}
 	if cfg.DatabaseURL != "" {
 		if a.Store, err = store.Open(ctx, cfg.DatabaseURL); err != nil {
 			return nil, err
 		}
-		a.Ingest = &ingest.Processor{Store: ingest.PG{S: a.Store}, BitGo: bg, Log: log}
+		a.Conns = &connections.Resolver{Store: a.Store, Keyring: kr, BaseURL: cfg.BitGoBaseURL, LocalFallback: a.BitGo}
+		a.Ingest = &ingest.Processor{Store: ingest.PG{S: a.Store}, Log: log,
+			BitGoFor: func(ctx context.Context, org uuid.UUID) (ingest.BitGo, error) { return a.Conns.ForOrg(ctx, org) }}
 	}
-	a.HTTP = httpapi.New(httpapi.Deps{Log: log, Wallets: bg})
+	var siwe *identity.SIWE
+	if cfg.SIWEDomain != "" {
+		siwe = &identity.SIWE{Domain: cfg.SIWEDomain}
+	}
+	a.HTTP = httpapi.New(httpapi.Deps{Log: log, Store: a.Store, Conns: a.Conns, SIWE: siwe})
 	return a, nil
 }
