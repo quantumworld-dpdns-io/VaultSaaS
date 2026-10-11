@@ -46,21 +46,45 @@ func Open(ctx context.Context, url string) (*Store, error) {
 
 func (s *Store) Close() { s.pool.Close() }
 
-// Tx is an org-scoped transaction.
+// Tx is a transaction bound to a session context: an organization (for
+// tenant tables) and/or a user (for per-user tables such as linked wallets).
 type Tx struct {
-	ctx context.Context
-	tx  pgx.Tx
-	Org uuid.UUID
+	ctx  context.Context
+	tx   pgx.Tx
+	Org  uuid.UUID
+	User uuid.UUID
 }
 
 // InOrg runs fn in a transaction bound to one organization.
 func (s *Store) InOrg(ctx context.Context, org uuid.UUID, fn func(*Tx) error) error {
+	return s.inSession(ctx, org, uuid.Nil, fn)
+}
+
+// InOrgAs is InOrg with the acting user recorded in the session as well.
+func (s *Store) InOrgAs(ctx context.Context, org, user uuid.UUID, fn func(*Tx) error) error {
+	return s.inSession(ctx, org, user, fn)
+}
+
+// AsUser runs fn bound to a user only (no tenant data is visible).
+func (s *Store) AsUser(ctx context.Context, user uuid.UUID, fn func(*Tx) error) error {
+	return s.inSession(ctx, uuid.Nil, user, fn)
+}
+
+func (s *Store) inSession(ctx context.Context, org, user uuid.UUID, fn func(*Tx) error) error {
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, "SELECT set_config('app.org_id', $1, true)", org.String()); err != nil {
+		if _, err := tx.Exec(ctx, "SELECT set_config('app.org_id', $1, true), set_config('app.user_id', $2, true)",
+			uuidOrEmpty(org), uuidOrEmpty(user)); err != nil {
 			return err
 		}
-		return fn(&Tx{ctx: ctx, tx: tx, Org: org})
+		return fn(&Tx{ctx: ctx, tx: tx, Org: org, User: user})
 	})
+}
+
+func uuidOrEmpty(id uuid.UUID) string {
+	if id == uuid.Nil {
+		return ""
+	}
+	return id.String()
 }
 
 // ---- organizations (cross-tenant lookups) ---------------------------------

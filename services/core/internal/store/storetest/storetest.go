@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/vaultops/core/internal/store"
 )
@@ -93,4 +94,31 @@ func withDB(t *testing.T, raw, db, user string) string {
 		u.User = url.UserPassword(user, appPassword)
 	}
 	return u.String()
+}
+
+// CreateUser inserts a Supabase auth user (as the owner) and returns its id.
+func CreateUser(t *testing.T, ownerURL, email string) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+	c, err := pgx.Connect(ctx, ownerURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close(ctx)
+	var id uuid.UUID
+	if err := c.QueryRow(ctx, `INSERT INTO auth.users (email) VALUES ($1) RETURNING id`, email).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+// Owner opens a connection as the database owner (bypasses RLS) for assertions.
+func Owner(t *testing.T, ownerURL string) *pgx.Conn {
+	t.Helper()
+	c, err := pgx.Connect(context.Background(), ownerURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { c.Close(context.Background()) })
+	return c
 }
