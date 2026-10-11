@@ -29,6 +29,12 @@ jobs:
           cache-dependency-path: services/core/go.sum
       - run: make test-core
       - run: make build-core
+      - name: database migrations (Supabase, owner role)
+        working-directory: services/core
+        env:
+          DATABASE_OWNER_URL: ${{ secrets.DATABASE_OWNER_URL }}
+          VAULTOPS_APP_DB_PASSWORD: ${{ secrets.VAULTOPS_APP_DB_PASSWORD }}
+        run: go run ./cmd/vaultctl migrate --dir ../../db/migrations --set-app-password
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/vaultops-deploy
