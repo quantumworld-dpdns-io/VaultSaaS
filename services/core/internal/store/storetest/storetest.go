@@ -44,10 +44,15 @@ func New(t *testing.T) (*store.Store, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer conn.Close(ctx)
+	// Roles are cluster-wide: serialise setup across parallel test packages.
+	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock(727001)"); err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Exec(ctx, "SELECT pg_advisory_unlock(727001)") //nolint:errcheck
 	if _, err := conn.Exec(ctx, "CREATE DATABASE "+name); err != nil {
 		t.Fatal(err)
 	}
-	conn.Close(ctx)
 	t.Cleanup(func() {
 		c, err := pgx.Connect(context.Background(), admin)
 		if err == nil {

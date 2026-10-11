@@ -26,6 +26,7 @@ module "aws_core" {
   source         = "../../modules/aws-core"
   env            = local.env
   aws_account_id = var.aws_account_id
+  siwe_domain    = "app-${local.env}.${var.domain}"
   bitgo_base_url = "https://app.bitgo-test.com"
   alert_email    = var.alert_email
   create_budgets = var.create_budgets

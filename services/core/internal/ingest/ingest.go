@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/vaultops/core/internal/bitgo"
+	"github.com/vaultops/core/internal/connections"
 	"github.com/vaultops/core/internal/domain"
 	"github.com/vaultops/core/internal/store"
 )
@@ -63,10 +64,13 @@ type BitGo interface {
 	GetWallet(ctx context.Context, coin, walletID string) (*bitgo.Wallet, error)
 }
 
+// ClientFor returns the BitGo client authenticated as the given org.
+type ClientFor func(ctx context.Context, org uuid.UUID) (BitGo, error)
+
 type Processor struct {
-	Store Store
-	BitGo BitGo
-	Log   *slog.Logger
+	Store    Store
+	BitGoFor ClientFor
+	Log      *slog.Logger
 }
 
 var idPattern = regexp.MustCompile(`^[A-Za-z0-9_:.-]{1,128}$`)
@@ -117,8 +121,16 @@ func (p *Processor) Handle(ctx context.Context, m Message, receiveCount int) err
 		return p.reject(ctx, org.ID, rec.ID, key, "webhook body has missing or malformed identifiers", nil)
 	}
 
+	bg, err := p.BitGoFor(ctx, org.ID)
+	if errors.Is(err, connections.ErrNotConnected) {
+		return p.reject(ctx, org.ID, rec.ID, key, "webhook received but the organization has no BitGo connection", nil)
+	}
+	if err != nil {
+		return p.fail(ctx, org.ID, rec.ID, key, receiveCount, err)
+	}
+
 	// Principle 2: the authoritative state comes from BitGo, not from the body.
-	t, err := p.BitGo.GetTransfer(ctx, ev.Coin, ev.Wallet, ev.Transfer)
+	t, err := bg.GetTransfer(ctx, ev.Coin, ev.Wallet, ev.Transfer)
 	if err != nil {
 		var be *bitgo.Error
 		if errors.As(err, &be) && (be.Status == http.StatusNotFound || be.Status == http.StatusBadRequest) {
@@ -141,7 +153,7 @@ func (p *Processor) Handle(ctx context.Context, m Message, receiveCount int) err
 	}
 	var fresh *bitgo.Wallet
 	if known == nil {
-		if fresh, err = p.BitGo.GetWallet(ctx, t.Coin, t.Wallet); err != nil {
+		if fresh, err = bg.GetWallet(ctx, t.Coin, t.Wallet); err != nil {
 			return p.fail(ctx, org.ID, rec.ID, key, receiveCount, err)
 		}
 	}

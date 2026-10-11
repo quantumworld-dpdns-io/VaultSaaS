@@ -110,7 +110,8 @@ func setup(t *testing.T) (*Processor, *fakeStore, *bitgomock.Server) {
 	srv := httptest.NewServer(m)
 	t.Cleanup(srv.Close)
 	fs := newFakeStore()
-	return &Processor{Store: fs, BitGo: bitgo.New(srv.URL, "bg", bitgo.WithMaxRetries(0)), Log: slog.New(slog.NewTextHandler(io.Discard, nil))}, fs, m
+	client := bitgo.New(srv.URL, "bg", bitgo.WithMaxRetries(0))
+	return &Processor{Store: fs, BitGoFor: func(context.Context, uuid.UUID) (BitGo, error) { return client, nil }, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}, fs, m
 }
 
 func msg(t *testing.T, body map[string]any) Message {

@@ -54,3 +54,8 @@ variable "monthly_budget_usd" {
   type    = number
   default = 5
 }
+
+variable "siwe_domain" {
+  description = "Dashboard host that wallets sign SIWE link messages for."
+  type        = string
+}

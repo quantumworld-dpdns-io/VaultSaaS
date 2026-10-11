@@ -24,7 +24,7 @@ func TestLoadResolvesSecretFromSSM(t *testing.T) {
 		}
 		return "v2x-secret", nil
 	}
-	c, err := load(context.Background(), env(map[string]string{"BITGO_TOKEN_SSM": "/vaultops/dev/bitgo-token"}), fetch)
+	c, err := load(context.Background(), env(map[string]string{"BITGO_TOKEN_SSM": "/vaultops/dev/bitgo-token", "VAULTOPS_ENV": "local"}), fetch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,5 +37,11 @@ func TestProdBitGoURLRequiresProdEnv(t *testing.T) {
 	_, err := load(context.Background(), env(map[string]string{"VAULTOPS_ENV": "dev", "BITGO_BASE_URL": BitGoProdURL}), nil)
 	if err == nil {
 		t.Fatal("expected error when dev points at BitGo production")
+	}
+}
+
+func TestGlobalBitGoTokenIsLocalOnly(t *testing.T) {
+	if _, err := load(context.Background(), env(map[string]string{"VAULTOPS_ENV": "prod", "BITGO_TOKEN": "x"}), nil); err == nil {
+		t.Fatal("a shared BitGo token must be refused outside local")
 	}
 }

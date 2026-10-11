@@ -135,8 +135,7 @@ type Member struct {
 }
 
 func (t *Tx) ListMembers() ([]Member, error) {
-	rows, err := t.tx.Query(t.ctx, `SELECT m.user_id, coalesce(u.email, ''), m.role, m.created_at
-		FROM app.organization_members m LEFT JOIN auth.users u ON u.id = m.user_id ORDER BY m.created_at`)
+	rows, err := t.tx.Query(t.ctx, `SELECT user_id, email, role, created_at FROM app.current_org_members()`)
 	if err != nil {
 		return nil, err
 	}

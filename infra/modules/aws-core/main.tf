@@ -35,18 +35,19 @@ locals {
 
   # Secrets are SecureString shells; values are written out-of-band with
   # `aws ssm put-parameter --overwrite` so they never enter Terraform state.
+  # Each organization stores its own BitGo token (sealed with token-enc-keys);
+  # there is deliberately no shared BitGo token in deployed environments.
   secure_parameters = {
-    "bitgo-token"   = "BitGo access token (read-only scopes) for the default connection"
-    "database-url"  = "Supabase Supavisor pooler URL (transaction mode, port 6543)"
-    "token-enc-key" = "Base64 AES-256 master key for envelope-encrypting stored BitGo tokens"
+    "database-url"   = "Supabase Supavisor pooler URL (transaction mode, port 6543) for role vaultops_app"
+    "token-enc-keys" = "AES-256 keyring for sealing stored BitGo tokens: 1:<base64>,2:<base64>"
   }
 
   common_env = {
-    VAULTOPS_ENV      = var.env
-    BITGO_BASE_URL    = var.bitgo_base_url
-    BITGO_TOKEN_SSM   = "${local.ssm_prefix}/bitgo-token"
-    DATABASE_URL_SSM  = "${local.ssm_prefix}/database-url"
-    TOKEN_ENC_KEY_SSM = "${local.ssm_prefix}/token-enc-key"
+    VAULTOPS_ENV       = var.env
+    BITGO_BASE_URL     = var.bitgo_base_url
+    DATABASE_URL_SSM   = "${local.ssm_prefix}/database-url"
+    TOKEN_ENC_KEYS_SSM = "${local.ssm_prefix}/token-enc-keys"
+    SIWE_DOMAIN        = var.siwe_domain
   }
 }
 

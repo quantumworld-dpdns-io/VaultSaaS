@@ -21,8 +21,14 @@ import (
 type Config struct {
 	Env          string // dev | prod | local
 	BitGoBaseURL string
-	BitGoToken   string
-	DatabaseURL  string // Supavisor transaction pooler URL for role vaultops_app
+	// BitGoToken is a LOCAL-ONLY fallback. Deployed environments use each
+	// organization's own encrypted connection (tenant isolation).
+	BitGoToken  string
+	DatabaseURL string // Supavisor transaction pooler URL for role vaultops_app
+	// TokenEncKeys is the keyring for sealing stored BitGo tokens: "1:<b64>,2:<b64>".
+	TokenEncKeys string
+	// SIWEDomain is the dashboard host[:port] wallets sign for (wallet linking).
+	SIWEDomain string
 	// Local development only: cmd/local polls this queue (ElasticMQ) instead
 	// of receiving SQS events from Lambda.
 	LocalQueueURL string
@@ -55,7 +61,11 @@ func load(ctx context.Context, getenv func(string) string, fetch secretFetcher) 
 	if c.DatabaseURL, err = secret(ctx, getenv, fetch, "DATABASE_URL"); err != nil {
 		return nil, err
 	}
+	if c.TokenEncKeys, err = secret(ctx, getenv, fetch, "TOKEN_ENC_KEYS"); err != nil {
+		return nil, err
+	}
 	c.LocalQueueURL = getenv("LOCAL_QUEUE_URL")
+	c.SIWEDomain = getenv("SIWE_DOMAIN")
 	return c, c.validate()
 }
 
@@ -63,6 +73,9 @@ func (c *Config) validate() error {
 	c.BitGoBaseURL = strings.TrimRight(c.BitGoBaseURL, "/")
 	if c.Env != "prod" && c.BitGoBaseURL == BitGoProdURL {
 		return fmt.Errorf("config: BitGo production URL is only allowed when VAULTOPS_ENV=prod")
+	}
+	if c.BitGoToken != "" && c.Env != "local" {
+		return fmt.Errorf("config: a global BITGO_TOKEN is only allowed locally; organizations use their own connections")
 	}
 	if c.LocalQueueURL != "" && c.Env != "local" {
 		return fmt.Errorf("config: LOCAL_QUEUE_URL is only for VAULTOPS_ENV=local")

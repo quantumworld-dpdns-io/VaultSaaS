@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/vaultops/core/internal/bitgo"
 	"github.com/vaultops/core/internal/bitgo/bitgomock"
@@ -28,7 +29,8 @@ func TestIngestAgainstPostgres(t *testing.T) {
 	m := bitgomock.New("bg")
 	srv := httptest.NewServer(m)
 	defer srv.Close()
-	p := &ingest.Processor{Store: ingest.PG{S: s}, BitGo: bitgo.New(srv.URL, "bg"), Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	client := bitgo.New(srv.URL, "bg")
+	p := &ingest.Processor{Store: ingest.PG{S: s}, BitGoFor: func(context.Context, uuid.UUID) (ingest.BitGo, error) { return client, nil }, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
 
 	tr, _ := m.AddTransfer(bitgomock.AddTransferRequest{WalletID: "wlt_eth_treasury", ValueString: "2500000000000000000", State: "unconfirmed"})
 	body := func(state string) string {
