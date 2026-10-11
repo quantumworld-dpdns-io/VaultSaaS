@@ -1,2 +1,28 @@
 .ignore.md
 *.local
+
+# build / deps
+node_modules/
+dist/
+.wrangler/
+services/core/bin/
+*.zip
+
+# terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan*.json
+crash.log
+
+# local tooling & secrets
+.tools/
+.env
+.env.*
+!.env.example
+.dev.vars
+
+# robot framework
+test/.venv/
+test/results/
