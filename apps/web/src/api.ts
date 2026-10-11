@@ -44,6 +44,13 @@ export interface Alert {
   severity: string;
   message: string;
   createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface AlertSettings {
+  largeTransfer: Record<string, string>;
+  dlqThreshold: number;
+  tokenWarnDays: number;
 }
 
 export interface Member {

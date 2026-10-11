@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/vaultops/core/internal/bitgo/bitgomock"
@@ -19,6 +20,7 @@ import (
 	"github.com/vaultops/core/internal/identity"
 	"github.com/vaultops/core/internal/objects"
 	"github.com/vaultops/core/internal/recon"
+	"github.com/vaultops/core/internal/rules"
 	"github.com/vaultops/core/internal/store"
 	"github.com/vaultops/core/internal/store/storetest"
 )
@@ -126,4 +128,15 @@ func (e *Env) CallRaw(u User, org, method, path, contentType, body string) (*htt
 	var out map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &out)
 	return rec, out
+}
+
+// RunScheduledRules runs the time-based alert rules for one org.
+func (e *Env) RunScheduledRules(org string) {
+	e.T.Helper()
+	id := uuid.MustParse(org)
+	if err := e.Store.InOrg(context.Background(), id, func(tx *store.Tx) error {
+		return rules.Scheduled(tx, id, time.Now())
+	}); err != nil {
+		e.T.Fatal(err)
+	}
 }

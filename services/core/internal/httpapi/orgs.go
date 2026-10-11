@@ -142,14 +142,15 @@ func (s *Server) createInvitation(w http.ResponseWriter, r *http.Request) {
 func (s *Server) putConnection(w http.ResponseWriter, r *http.Request) {
 	sc := authz.ScopeFrom(r.Context())
 	var req struct {
-		Token        string `json:"token"`
-		EnterpriseID string `json:"enterpriseId"`
+		Token          string     `json:"token"`
+		EnterpriseID   string     `json:"enterpriseId"`
+		TokenExpiresAt *time.Time `json:"tokenExpiresAt"`
 	}
 	if decode(r, &req) != nil || len(req.Token) < 8 || len(req.Token) > 512 || len(req.EnterpriseID) > 128 {
 		writeError(w, http.StatusBadRequest, "invalid_body")
 		return
 	}
-	n, err := s.conns.Put(r.Context(), sc.Org, sc.UserID, req.Token, req.EnterpriseID)
+	n, err := s.conns.Put(r.Context(), sc.Org, sc.UserID, req.Token, req.EnterpriseID, req.TokenExpiresAt)
 	var be *bitgo.Error
 	if errors.As(err, &be) {
 		writeError(w, http.StatusUnprocessableEntity, "bitgo_token_rejected")

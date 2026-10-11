@@ -82,6 +82,9 @@ func New(d Deps) *Server {
 	s.mux.Handle("GET /v1/reconciliation/runs", org(authz.Viewer, s.listRuns))
 	s.mux.Handle("GET /v1/reconciliation/runs/{id}/items", org(authz.Viewer, s.listRunItems))
 	s.mux.Handle("GET /v1/reports/daily", org(authz.Viewer, s.dailyReport))
+	s.mux.Handle("GET /v1/org/alert-settings", org(authz.Viewer, s.getAlertSettings))
+	s.mux.Handle("PUT /v1/org/alert-settings", org(authz.Admin, s.putAlertSettings))
+	s.mux.Handle("POST /v1/alerts/{id}/resolve", org(authz.Admin, s.resolveAlert))
 	return s
 }
 

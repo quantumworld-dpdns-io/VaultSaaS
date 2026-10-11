@@ -3,7 +3,7 @@ import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { accessToken, onAuthChange, signIn, signOut } from "./auth";
 import { api, getMe, setCurrentOrg, type Me } from "./api";
-import { Alerts, Members, Transfers } from "./OrgPanels";
+import { Alerts, AlertSettingsForm, Members, Transfers } from "./OrgPanels";
 import { Reconciliation } from "./Reconciliation";
 import { linkInjectedWallet } from "./siwe";
 import { Wallets } from "./Wallets";
@@ -191,7 +191,8 @@ function OrgView({ canAdmin }: { canAdmin: boolean }) {
       </section>
       <section>
         <h2>Security alerts</h2>
-        <Alerts />
+        <Alerts canAdmin={canAdmin} />
+        {canAdmin && <AlertSettingsForm />}
       </section>
       <section>
         <h2>Members</h2>

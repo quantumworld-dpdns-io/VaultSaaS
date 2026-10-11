@@ -52,8 +52,14 @@ function ConnectBitGo() {
   const qc = useQueryClient();
   const [token, setToken] = useState("");
   const [enterpriseId, setEnterpriseId] = useState("");
+  const [expires, setExpires] = useState("");
   const m = useMutation({
-    mutationFn: () => api<{ walletsVisible: number }>("PUT", "/api/v1/org/bitgo-connection", { token, enterpriseId }),
+    mutationFn: () =>
+      api<{ walletsVisible: number }>("PUT", "/api/v1/org/bitgo-connection", {
+        token,
+        enterpriseId,
+        tokenExpiresAt: expires ? new Date(expires + "T00:00:00Z").toISOString() : null,
+      }),
     onSuccess: () => {
       setToken("");
       void qc.invalidateQueries({ queryKey: ["wallets"] });
@@ -79,6 +85,10 @@ function ConnectBitGo() {
       <label>
         Enterprise ID (optional)
         <input value={enterpriseId} onChange={(e) => setEnterpriseId(e.target.value)} />
+      </label>
+      <label>
+        Token expires on (optional — VaultOps warns before it lapses)
+        <input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} data-testid="bitgo-token-expires" />
       </label>
       <button type="submit" disabled={m.isPending} data-testid="connect-submit">Connect</button>
       {m.isError && <p role="alert">BitGo rejected this token.</p>}

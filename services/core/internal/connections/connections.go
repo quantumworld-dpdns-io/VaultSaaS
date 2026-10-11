@@ -54,7 +54,7 @@ func (r *Resolver) ForOrg(ctx context.Context, org uuid.UUID) (*bitgo.Client, er
 }
 
 // Put verifies the token with a read-only call, then stores it sealed.
-func (r *Resolver) Put(ctx context.Context, org, actor uuid.UUID, token, enterpriseID string) (int, error) {
+func (r *Resolver) Put(ctx context.Context, org, actor uuid.UUID, token, enterpriseID string, expiresAt *time.Time) (int, error) {
 	if r.Keyring == nil {
 		return 0, errors.New("connections: TOKEN_ENC_KEYS not configured")
 	}
@@ -73,12 +73,13 @@ func (r *Resolver) Put(ctx context.Context, org, actor uuid.UUID, token, enterpr
 	err = r.Store.InOrgAs(ctx, org, actor, func(tx *store.Tx) error {
 		if err := tx.PutBitGoConnection(store.BitGoConnection{
 			Environment: env, EnterpriseID: enterpriseID, EncryptedToken: sealed, KeyVersion: ver,
-			OwnerUserID: actor, VerifiedAt: time.Now(),
+			OwnerUserID: actor, VerifiedAt: time.Now(), TokenExpiresAt: expiresAt,
 		}); err != nil {
 			return err
 		}
 		return tx.AppendAudit(org, "user:"+actor.String(), "bitgo_connection.updated", "organization", org.String(),
-			map[string]any{"environment": env, "enterprise_id": enterpriseID, "wallets_visible": len(wallets), "key_version": ver})
+			map[string]any{"environment": env, "enterprise_id": enterpriseID, "wallets_visible": len(wallets), "key_version": ver,
+				"token_expires_at": expiresAt})
 	})
 	return len(wallets), err
 }

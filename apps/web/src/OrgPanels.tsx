@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { decimalsFor, formatBaseUnits } from "./amount";
-import { api, fetchAlerts, fetchMembers, fetchTransfers } from "./api";
+import { api, fetchAlerts, fetchMembers, fetchTransfers, type AlertSettings } from "./api";
 
 export function Transfers() {
   const q = useQuery({ queryKey: ["transfers"], queryFn: fetchTransfers, refetchInterval: 15_000 });
@@ -34,19 +34,78 @@ export function Transfers() {
   );
 }
 
-export function Alerts() {
+export function Alerts({ canAdmin }: { canAdmin: boolean }) {
+  const qc = useQueryClient();
   const q = useQuery({ queryKey: ["alerts"], queryFn: fetchAlerts, refetchInterval: 15_000 });
+  const resolve = useMutation({
+    mutationFn: (id: string) => api("POST", `/api/v1/alerts/${id}/resolve`),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["alerts"] }),
+  });
   if (q.isPending) return <p>Loading…</p>;
   if (q.isError) return <p role="alert">Could not load alerts.</p>;
-  if (q.data.length === 0) return <p className="muted" data-testid="alerts-empty">No alerts.</p>;
+  const open = q.data.filter((a) => !a.resolvedAt);
+  if (open.length === 0) return <p className="muted" data-testid="alerts-empty">No open alerts.</p>;
   return (
     <ul className="alerts" data-testid="alerts-list">
-      {q.data.map((a) => (
+      {open.map((a) => (
         <li key={a.id} className={`sev-${a.severity}`} data-testid={`alert-${a.kind}`}>
           <strong>{a.severity}</strong> {a.kind} — {a.message}
+          {canAdmin && (
+            <button className="link" onClick={() => resolve.mutate(a.id)} data-testid={`resolve-${a.kind}`}>
+              Resolve
+            </button>
+          )}
         </li>
       ))}
     </ul>
+  );
+}
+
+export function AlertSettingsForm() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["alert-settings"], queryFn: () => api<AlertSettings>("GET", "/api/v1/org/alert-settings") });
+  const [draft, setDraft] = useState<string | null>(null);
+  const [dlq, setDlq] = useState<number | null>(null);
+  const [warn, setWarn] = useState<number | null>(null);
+  const save = useMutation({
+    mutationFn: (s: AlertSettings) => api<AlertSettings>("PUT", "/api/v1/org/alert-settings", s),
+    onSuccess: () => {
+      setDraft(null);
+      void qc.invalidateQueries({ queryKey: ["alert-settings"] });
+    },
+  });
+  if (!q.data) return null;
+  const text = draft ?? Object.entries(q.data.largeTransfer).map(([c, v]) => `${c} ${v}`).join("\n");
+  return (
+    <form
+      className="card"
+      data-testid="alert-settings"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const largeTransfer: Record<string, string> = {};
+        for (const line of text.split("\n")) {
+          const [coin, amount] = line.trim().split(/\s+/);
+          if (coin && amount) largeTransfer[coin.toLowerCase()] = amount;
+        }
+        save.mutate({ largeTransfer, dlqThreshold: dlq ?? q.data!.dlqThreshold, tokenWarnDays: warn ?? q.data!.tokenWarnDays });
+      }}
+    >
+      <label>
+        Large-transfer thresholds (one per line: coin and amount in base units)
+        <textarea rows={3} value={text} onChange={(e) => setDraft(e.target.value)} data-testid="large-thresholds" />
+      </label>
+      <label>
+        Failed webhooks in 24 h before alerting
+        <input type="number" min={1} max={1000} value={dlq ?? q.data.dlqThreshold} onChange={(e) => setDlq(Number(e.target.value))} />
+      </label>
+      <label>
+        Warn this many days before the BitGo token expires
+        <input type="number" min={1} max={90} value={warn ?? q.data.tokenWarnDays} onChange={(e) => setWarn(Number(e.target.value))} />
+      </label>
+      <button type="submit" data-testid="save-alert-settings">Save</button>
+      {save.isSuccess && <span data-testid="alert-settings-saved">Saved.</span>}
+      {save.isError && <span role="alert">Invalid settings.</span>}
+    </form>
   );
 }
 
