@@ -2,10 +2,14 @@ package httpapi_test
 
 import (
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/vaultops/core/internal/bitgo/bitgomock"
 	"github.com/vaultops/core/internal/httpapi/httpapitest"
+	"github.com/vaultops/core/internal/report"
 )
 
 func TestReconciliationAPI(t *testing.T) {
@@ -38,6 +42,26 @@ func TestReconciliationAPI(t *testing.T) {
 	rec, items := e.Call(alice, orgA, "GET", "/v1/reconciliation/runs/"+runID+"/items", nil)
 	if rec.Code != http.StatusOK || len(items["items"].([]any)) != 2 {
 		t.Fatalf("items: %d %v", rec.Code, items)
+	}
+
+	// Daily report: CSV locally, viewer access, date validated.
+	today := time.Now().In(report.Taipei).Format("2006-01-02")
+	rec = httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/v1/reports/daily?date="+today, nil)
+	req.Header.Set("X-Vaultops-User-Id", alice.ID.String())
+	req.Header.Set("X-Vaultops-Org-Id", orgA)
+	e.Handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/csv") ||
+		!strings.Contains(rec.Body.String(), "missing_internal") && !strings.Contains(rec.Body.String(), "transfer,") {
+		t.Fatalf("report: %d %s %s", rec.Code, rec.Header().Get("Content-Type"), rec.Body)
+	}
+	for _, bad := range []string{"2999-01-01", "yesterday", "2020-01-01"} {
+		if rec, _ := e.Call(alice, orgA, "GET", "/v1/reports/daily?date="+bad, nil); rec.Code != http.StatusBadRequest {
+			t.Errorf("date %s: %d", bad, rec.Code)
+		}
+	}
+	if rec, _ := e.Call(bob, orgA, "GET", "/v1/reports/daily?date="+today, nil); rec.Code != http.StatusForbidden {
+		t.Errorf("cross-tenant report: %d", rec.Code)
 	}
 
 	// Bob cannot import into, run, or read Alice's reconciliation.

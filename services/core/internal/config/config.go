@@ -33,6 +33,7 @@ type Config struct {
 	// or a local directory in development.
 	R2Endpoint, R2AuditBucket, R2AccessKeyID, R2SecretAccessKey string
 	AnchorDir                                                   string
+	R2ReportsBucket, ReportsDir                                 string
 	// ReconLookback is how far back each reconciliation re-reads BitGo.
 	ReconLookback time.Duration
 	// SIWEDomain is the dashboard host[:port] wallets sign for (wallet linking).
@@ -83,6 +84,7 @@ func load(ctx context.Context, getenv func(string) string, fetch secretFetcher) 
 		c.ReconLookback = time.Duration(n) * time.Hour
 	}
 	c.R2Endpoint, c.R2AuditBucket, c.AnchorDir = getenv("R2_ENDPOINT"), getenv("R2_AUDIT_BUCKET"), getenv("ANCHOR_DIR")
+	c.R2ReportsBucket, c.ReportsDir = getenv("R2_REPORTS_BUCKET"), getenv("REPORTS_DIR")
 	if c.R2AccessKeyID, err = secret(ctx, getenv, fetch, "R2_ACCESS_KEY_ID"); err != nil {
 		return nil, err
 	}
@@ -100,8 +102,8 @@ func (c *Config) validate() error {
 	if c.BitGoToken != "" && c.Env != "local" {
 		return fmt.Errorf("config: a global BITGO_TOKEN is only allowed locally; organizations use their own connections")
 	}
-	if c.AnchorDir != "" && c.Env != "local" {
-		return fmt.Errorf("config: ANCHOR_DIR is only for VAULTOPS_ENV=local; deployed anchors go to R2")
+	if (c.AnchorDir != "" || c.ReportsDir != "") && c.Env != "local" {
+		return fmt.Errorf("config: ANCHOR_DIR/REPORTS_DIR are only for VAULTOPS_ENV=local; deployed objects go to R2")
 	}
 	if c.LocalQueueURL != "" && c.Env != "local" {
 		return fmt.Errorf("config: LOCAL_QUEUE_URL is only for VAULTOPS_ENV=local")

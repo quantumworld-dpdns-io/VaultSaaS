@@ -40,9 +40,9 @@ locals {
   secure_parameters = {
     "database-url"   = "Supabase Supavisor pooler URL (transaction mode, port 6543) for role vaultops_app"
     "token-enc-keys" = "AES-256 keyring for sealing stored BitGo tokens: 1:<base64>,2:<base64>"
-    # R2 API token scoped to the audit-anchor bucket (object write + read only)
-    "r2-access-key-id"     = "R2 access key id for the audit-anchor bucket"
-    "r2-secret-access-key" = "R2 secret access key for the audit-anchor bucket"
+    # R2 API token scoped to the audit-anchor and reports buckets (object read/write only)
+    "r2-access-key-id"     = "R2 access key id for the audit-anchor and reports buckets"
+    "r2-secret-access-key" = "R2 secret access key for the audit-anchor and reports buckets"
   }
 
   common_env = {
@@ -54,6 +54,7 @@ locals {
     # Audit anchors go to Cloudflare R2 (bucket lock), not S3 — principle 0.
     R2_ENDPOINT              = var.r2_endpoint
     R2_AUDIT_BUCKET          = var.r2_audit_bucket
+    R2_REPORTS_BUCKET        = var.r2_reports_bucket
     R2_ACCESS_KEY_ID_SSM     = "${local.ssm_prefix}/r2-access-key-id"
     R2_SECRET_ACCESS_KEY_SSM = "${local.ssm_prefix}/r2-secret-access-key"
   }

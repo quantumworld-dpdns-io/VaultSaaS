@@ -20,6 +20,7 @@ import (
 	"github.com/vaultops/core/internal/authz"
 	"github.com/vaultops/core/internal/connections"
 	"github.com/vaultops/core/internal/identity"
+	"github.com/vaultops/core/internal/objects"
 	"github.com/vaultops/core/internal/recon"
 	"github.com/vaultops/core/internal/store"
 )
@@ -34,27 +35,29 @@ const (
 )
 
 type Server struct {
-	mux   *http.ServeMux
-	log   *slog.Logger
-	store *store.Store
-	conns *connections.Resolver
-	siwe  *identity.SIWE
-	recon *recon.Engine
+	mux     *http.ServeMux
+	log     *slog.Logger
+	store   *store.Store
+	conns   *connections.Resolver
+	siwe    *identity.SIWE
+	recon   *recon.Engine
+	reports objects.Store
 }
 
 type Deps struct {
-	Log   *slog.Logger
-	Store *store.Store
-	Conns *connections.Resolver
-	SIWE  *identity.SIWE
-	Recon *recon.Engine
+	Log     *slog.Logger
+	Store   *store.Store
+	Conns   *connections.Resolver
+	SIWE    *identity.SIWE
+	Recon   *recon.Engine
+	Reports objects.Store
 }
 
 func New(d Deps) *Server {
 	if d.Log == nil {
 		d.Log = slog.Default()
 	}
-	s := &Server{mux: http.NewServeMux(), log: d.Log, store: d.Store, conns: d.Conns, siwe: d.SIWE, recon: d.Recon}
+	s := &Server{mux: http.NewServeMux(), log: d.Log, store: d.Store, conns: d.Conns, siwe: d.SIWE, recon: d.Recon, reports: d.Reports}
 	s.mux.HandleFunc("GET /healthz", s.healthz)
 
 	user := func(h http.Handler) http.Handler { return s.requireStore(s.requireUser(h)) }
@@ -78,6 +81,7 @@ func New(d Deps) *Server {
 	s.mux.Handle("POST /v1/reconciliation/runs", org(authz.Admin, s.runReconciliation))
 	s.mux.Handle("GET /v1/reconciliation/runs", org(authz.Viewer, s.listRuns))
 	s.mux.Handle("GET /v1/reconciliation/runs/{id}/items", org(authz.Viewer, s.listRunItems))
+	s.mux.Handle("GET /v1/reports/daily", org(authz.Viewer, s.dailyReport))
 	return s
 }
 

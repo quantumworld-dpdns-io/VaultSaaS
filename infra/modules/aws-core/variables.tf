@@ -69,3 +69,8 @@ variable "r2_audit_bucket" {
   description = "Name of the audit-anchor R2 bucket (bucket lock enabled)."
   type        = string
 }
+
+variable "r2_reports_bucket" {
+  description = "Name of the reports R2 bucket (daily CSVs, presigned downloads)."
+  type        = string
+}

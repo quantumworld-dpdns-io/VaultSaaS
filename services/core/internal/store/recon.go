@@ -246,3 +246,24 @@ func (t *Tx) ItemExists(kind string, transfer, expected *uuid.UUID) (bool, error
 		kind, transfer, expected).Scan(&ok)
 	return ok, err
 }
+
+// ItemsBetween lists findings raised in [from, to), for the daily report.
+func (t *Tx) ItemsBetween(from, to time.Time) ([]ItemRow, error) {
+	rows, err := t.tx.Query(t.ctx, `SELECT i.id, i.kind, i.transfer_id, tr.provider_transfer_id, i.expected_payment_id,
+		e.reference, i.details::text, i.created_at
+		FROM app.reconciliation_items i
+		LEFT JOIN app.transfers tr ON tr.id = i.transfer_id
+		LEFT JOIN app.expected_payments e ON e.id = i.expected_payment_id
+		WHERE i.created_at >= $1 AND i.created_at < $2 AND i.kind <> 'matched'
+		ORDER BY i.created_at, i.kind`, from, to)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (ItemRow, error) {
+		var x ItemRow
+		var d string
+		err := r.Scan(&x.ID, &x.Kind, &x.TransferID, &x.ProviderTransferID, &x.ExpectedPaymentID, &x.Reference, &d, &x.CreatedAt)
+		x.Details = json.RawMessage(d)
+		return x, err
+	})
+}

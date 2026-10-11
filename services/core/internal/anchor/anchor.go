@@ -15,21 +15,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/vaultops/core/internal/objects"
 	"github.com/vaultops/core/internal/store"
 )
-
-// ObjectStore is the minimal object API (R2 via S3, or a local directory).
-type ObjectStore interface {
-	Put(ctx context.Context, key string, body []byte) error
-	Get(ctx context.Context, key string) ([]byte, error)
-	List(ctx context.Context, prefix string) ([]string, error)
-}
 
 type Record struct {
 	OrganizationID uuid.UUID `json:"organizationId"`
@@ -42,7 +34,7 @@ type Record struct {
 
 type Anchorer struct {
 	Store   *store.Store
-	Objects ObjectStore
+	Objects objects.Store // write-once (R2 audit-anchor bucket with lock)
 	Log     *slog.Logger
 	Now     func() time.Time
 }
@@ -134,11 +126,4 @@ func (a *Anchorer) alert(ctx context.Context, org uuid.UUID, kind, msg string, d
 		a.Log.Error("raise alert", "err", err)
 	}
 	return org.String() + ": " + msg
-}
-
-// Dir is a local ObjectStore for development and tests.
-type Dir struct{ Root string }
-
-func (d Dir) path(key string) string {
-	return filepath.Join(d.Root, filepath.FromSlash(strings.TrimPrefix(key, "/")))
 }

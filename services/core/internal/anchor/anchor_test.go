@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/vaultops/core/internal/anchor"
+	"github.com/vaultops/core/internal/objects"
 	"github.com/vaultops/core/internal/store"
 	"github.com/vaultops/core/internal/store/storetest"
 )
@@ -28,7 +29,7 @@ func TestAnchorDetectsRecomputedHistory(t *testing.T) {
 		}
 	}
 	appendN(3)
-	objs := anchor.Dir{Root: t.TempDir()}
+	objs := objects.Dir{Root: t.TempDir(), WriteOnce: true}
 	a := &anchor.Anchorer{Store: s, Objects: objs}
 
 	res, err := a.Run(ctx)
@@ -73,7 +74,7 @@ func TestAnchorDetectsRecomputedHistory(t *testing.T) {
 }
 
 func TestDirRefusesOverwrite(t *testing.T) {
-	d := anchor.Dir{Root: t.TempDir()}
+	d := objects.Dir{Root: t.TempDir(), WriteOnce: true}
 	ctx := context.Background()
 	if err := d.Put(ctx, "anchors/x.json", []byte("1")); err != nil {
 		t.Fatal(err)
@@ -85,7 +86,7 @@ func TestDirRefusesOverwrite(t *testing.T) {
 
 func TestDirListHandlesUncleanRoot(t *testing.T) {
 	base := t.TempDir()
-	d := anchor.Dir{Root: base + "/sub/../anchors"}
+	d := objects.Dir{Root: base + "/sub/../anchors", WriteOnce: true}
 	ctx := context.Background()
 	if err := d.Put(ctx, "anchors/org/a.json", []byte("1")); err != nil {
 		t.Fatal(err)

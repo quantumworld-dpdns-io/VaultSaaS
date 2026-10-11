@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/vaultops/core/internal/app"
+	"github.com/vaultops/core/internal/report"
 )
 
 type event struct {
@@ -43,8 +45,7 @@ func run(ctx context.Context, a *app.App, log *slog.Logger, task string) (map[st
 	case "reconcile":
 		return reconcileAll(ctx, a, log)
 	case "daily_report":
-		log.Info("task not implemented yet", "task", task)
-		return map[string]any{"skipped": task}, nil
+		return dailyReports(ctx, a, log)
 	}
 	return nil, fmt.Errorf("unknown task %q", task)
 }
@@ -74,4 +75,30 @@ func reconcileAll(ctx context.Context, a *app.App, log *slog.Logger) (map[string
 		return out, fmt.Errorf("%d of %d organizations failed to reconcile", failed, len(orgs))
 	}
 	return out, nil
+}
+
+// dailyReports publishes yesterday's (Asia/Taipei) report for every org.
+func dailyReports(ctx context.Context, a *app.App, log *slog.Logger) (map[string]any, error) {
+	if a.Store == nil || a.Reports == nil {
+		return nil, fmt.Errorf("daily_report needs DATABASE_URL and R2 reports settings")
+	}
+	orgs, err := a.Store.AllOrganizations(ctx)
+	if err != nil {
+		return nil, err
+	}
+	day := time.Now().In(report.Taipei).Add(-24 * time.Hour)
+	failed := 0
+	for _, org := range orgs {
+		key, _, err := report.Publish(ctx, a.Store, a.Reports, org, day)
+		if err != nil {
+			failed++
+			log.Error("daily report failed", "org", org, "err", err)
+			continue
+		}
+		log.Info("daily report published", "org", org, "key", key)
+	}
+	if failed > 0 {
+		return nil, fmt.Errorf("%d of %d daily reports failed", failed, len(orgs))
+	}
+	return map[string]any{"published": len(orgs), "day": day.Format("2006-01-02")}, nil
 }

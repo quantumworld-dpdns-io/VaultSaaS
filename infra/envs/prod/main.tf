@@ -23,12 +23,13 @@ provider "aws" {
 provider "cloudflare" {}
 
 module "aws_core" {
-  source          = "../../modules/aws-core"
-  env             = local.env
-  aws_account_id  = var.aws_account_id
-  r2_endpoint     = "https://${var.cloudflare_account_id}.r2.cloudflarestorage.com"
-  r2_audit_bucket = module.cloudflare_edge.r2_buckets["audit-anchor"]
-  siwe_domain     = "app.${var.domain}"
+  source            = "../../modules/aws-core"
+  env               = local.env
+  aws_account_id    = var.aws_account_id
+  r2_endpoint       = "https://${var.cloudflare_account_id}.r2.cloudflarestorage.com"
+  r2_audit_bucket   = module.cloudflare_edge.r2_buckets["audit-anchor"]
+  r2_reports_bucket = module.cloudflare_edge.r2_buckets["reports"]
+  siwe_domain       = "app.${var.domain}"
   # Stays on BitGo testnet until Go/No-Go gate 2 (commercial terms) passes.
   bitgo_base_url = var.bitgo_base_url
   alert_email    = var.alert_email

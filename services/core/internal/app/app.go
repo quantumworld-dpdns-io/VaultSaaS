@@ -16,20 +16,22 @@ import (
 	"github.com/vaultops/core/internal/httpapi"
 	"github.com/vaultops/core/internal/identity"
 	"github.com/vaultops/core/internal/ingest"
+	"github.com/vaultops/core/internal/objects"
 	"github.com/vaultops/core/internal/recon"
 	"github.com/vaultops/core/internal/store"
 )
 
 type App struct {
-	Config *config.Config
-	Log    *slog.Logger
-	BitGo  *bitgo.Client
-	Store  *store.Store // nil when DATABASE_URL is not configured
-	HTTP   http.Handler
-	Conns  *connections.Resolver // nil without a store
-	Ingest *ingest.Processor     // nil without a store
-	Anchor *anchor.Anchorer      // nil without a store and an object store
-	Recon  *recon.Engine         // nil without a store
+	Config  *config.Config
+	Log     *slog.Logger
+	BitGo   *bitgo.Client
+	Store   *store.Store // nil when DATABASE_URL is not configured
+	HTTP    http.Handler
+	Conns   *connections.Resolver // nil without a store
+	Ingest  *ingest.Processor     // nil without a store
+	Anchor  *anchor.Anchorer      // nil without a store and an object store
+	Recon   *recon.Engine         // nil without a store
+	Reports objects.Store         // nil unless R2 or REPORTS_DIR is configured
 }
 
 func New(ctx context.Context, log *slog.Logger) (*App, error) {
@@ -58,21 +60,27 @@ func New(ctx context.Context, log *slog.Logger) (*App, error) {
 	if a.Store != nil {
 		a.Recon = &recon.Engine{Store: a.Store, Log: log, Lookback: cfg.ReconLookback,
 			BitGoFor: func(ctx context.Context, org uuid.UUID) (recon.BitGo, error) { return a.Conns.ForOrg(ctx, org) }}
-		var objs anchor.ObjectStore
+		var anchors objects.Store
 		switch {
 		case cfg.R2Endpoint != "" && cfg.R2AuditBucket != "":
-			objs = anchor.NewR2(cfg.R2Endpoint, cfg.R2AuditBucket, cfg.R2AccessKeyID, cfg.R2SecretAccessKey)
+			anchors = objects.NewR2(cfg.R2Endpoint, cfg.R2AuditBucket, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, true)
 		case cfg.AnchorDir != "":
-			objs = anchor.Dir{Root: cfg.AnchorDir}
+			anchors = objects.Dir{Root: cfg.AnchorDir, WriteOnce: true}
 		}
-		if objs != nil {
-			a.Anchor = &anchor.Anchorer{Store: a.Store, Objects: objs, Log: log}
+		if anchors != nil {
+			a.Anchor = &anchor.Anchorer{Store: a.Store, Objects: anchors, Log: log}
+		}
+		switch {
+		case cfg.R2Endpoint != "" && cfg.R2ReportsBucket != "":
+			a.Reports = objects.NewR2(cfg.R2Endpoint, cfg.R2ReportsBucket, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, false)
+		case cfg.ReportsDir != "":
+			a.Reports = objects.Dir{Root: cfg.ReportsDir}
 		}
 	}
 	var siwe *identity.SIWE
 	if cfg.SIWEDomain != "" {
 		siwe = &identity.SIWE{Domain: cfg.SIWEDomain}
 	}
-	a.HTTP = httpapi.New(httpapi.Deps{Log: log, Store: a.Store, Conns: a.Conns, SIWE: siwe, Recon: a.Recon})
+	a.HTTP = httpapi.New(httpapi.Deps{Log: log, Store: a.Store, Conns: a.Conns, SIWE: siwe, Recon: a.Recon, Reports: a.Reports})
 	return a, nil
 }

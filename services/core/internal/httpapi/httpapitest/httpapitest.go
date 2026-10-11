@@ -17,6 +17,7 @@ import (
 	"github.com/vaultops/core/internal/crypto"
 	"github.com/vaultops/core/internal/httpapi"
 	"github.com/vaultops/core/internal/identity"
+	"github.com/vaultops/core/internal/objects"
 	"github.com/vaultops/core/internal/recon"
 	"github.com/vaultops/core/internal/store"
 	"github.com/vaultops/core/internal/store/storetest"
@@ -53,10 +54,11 @@ func New(t *testing.T) *Env {
 	}
 	conns := &connections.Resolver{Store: s, Keyring: kr, BaseURL: srv.URL}
 	h := httpapi.New(httpapi.Deps{
-		Log:   slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Store: s,
-		Conns: conns,
-		SIWE:  &identity.SIWE{Domain: SIWEDomain},
+		Log:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Store:   s,
+		Conns:   conns,
+		SIWE:    &identity.SIWE{Domain: SIWEDomain},
+		Reports: objects.Dir{Root: t.TempDir()},
 		Recon: &recon.Engine{Store: s, BitGoFor: func(ctx context.Context, org uuid.UUID) (recon.BitGo, error) {
 			return conns.ForOrg(ctx, org)
 		}},
