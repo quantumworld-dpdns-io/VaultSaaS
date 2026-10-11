@@ -295,9 +295,14 @@ user_wallets               (user_id, chain, address, verified_at)  -- SIWE 連�
 - 差異分類：`matched`、`amount_mismatch`、`missing_bitgo`、`missing_internal`（多出入帳）、`status_mismatch`，另加 `missed_webhook`（BitGo 有、帳本沒有 → 回補）。
 - **驗收**：在 testnet 製造「漏 webhook」「金額不符」「多出入帳」三種情境，皆被正確分類。✅（以 mock BitGo）
 
-### M5 — Security Alerts & Demo（第 11–12 週，~20h）
-- 告警規則：大額、新目的地址、政策變更、DLQ 堆積、token 即將過期。
-- SAST（gosec、semgrep）、依賴掃描、threat model 文件、Demo 影片與 README。
+### M5 — Security Alerts & Demo（第 11–12 週，~20h）— 🚧 進行中
+- [x] 告警規則：大額、新目的地址、政策變更、DLQ 堆積、token 即將過期 — `da10c4c`
+- [ ] 告警設定／解除 API 與 Dashboard（門檻、token 到期日）
+- [ ] SAST（gosec、semgrep）、依賴掃描（govulncheck、npm audit、Dependabot）、Terraform 掃描
+- [ ] threat model（STRIDE）與 runbooks（edge key 輪替、DLQ、備份還原）
+- [ ] 每日 `pg_dump` 加密備份至 R2（GitHub Actions）
+- [ ] README demo 流程；Demo 影片（需人工錄製）
+- [ ] Robot M5 端到端驗收 + compliance
 - **驗收**：完整展示「BitGo testnet 轉帳 → webhook → 入帳 → 對帳 → 報表 → 告警」。
 
 ### Phase 2（MVP 後，約 6–8 週）— Approve + 商業化
