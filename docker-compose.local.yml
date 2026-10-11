@@ -1,5 +1,6 @@
 # Local stand-ins for managed services. Never used in deployed environments.
-#   postgres -> Supabase Postgres
+#   postgres  -> Supabase Postgres (with a stub auth schema)
+#   elasticmq -> Amazon SQS (+ DLQ, maxReceiveCount 5)
 services:
   postgres:
     image: postgres:17-alpine
@@ -7,8 +8,20 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: vaultops
-    ports: ["54322:5432"]
+    ports: ["127.0.0.1:54322:5432"]
+    volumes:
+      - ./db/local/00_supabase_stub.sql:/docker-entrypoint-initdb.d/00_supabase_stub.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d vaultops"]
+      interval: 2s
+      retries: 30
+
+  elasticmq:
+    image: softwaremill/elasticmq-native:1.7.1
+    ports: ["127.0.0.1:9324:9324"]
+    volumes:
+      - ./db/local/elasticmq.conf:/opt/elasticmq.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- 'http://127.0.0.1:9324/?Action=ListQueues' >/dev/null 2>&1 || exit 1"]
       interval: 2s
       retries: 30
