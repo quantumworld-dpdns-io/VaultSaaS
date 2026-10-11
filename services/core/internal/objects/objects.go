@@ -39,12 +39,21 @@ type Dir struct {
 	WriteOnce bool
 }
 
-func (d Dir) path(key string) string {
-	return filepath.Join(d.Root, filepath.FromSlash(strings.TrimPrefix(key, "/")))
+var ErrInvalidKey = errors.New("objects: invalid key")
+
+// path maps a key to a file under Root; keys with ".." or absolute paths are refused.
+func (d Dir) path(key string) (string, error) {
+	if !fs.ValidPath(key) {
+		return "", ErrInvalidKey
+	}
+	return filepath.Join(d.Root, filepath.FromSlash(key)), nil
 }
 
 func (d Dir) Put(_ context.Context, key string, body []byte) error {
-	p := d.path(key)
+	p, err := d.path(key)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
 		return err
 	}
@@ -52,7 +61,7 @@ func (d Dir) Put(_ context.Context, key string, body []byte) error {
 	if d.WriteOnce {
 		flags = os.O_WRONLY | os.O_CREATE | os.O_EXCL
 	}
-	f, err := os.OpenFile(p, flags, 0o640)
+	f, err := os.OpenFile(p, flags, 0o600) // #nosec G304 -- p is validated by fs.ValidPath under Root
 	if err != nil {
 		return err
 	}
@@ -62,7 +71,11 @@ func (d Dir) Put(_ context.Context, key string, body []byte) error {
 }
 
 func (d Dir) Get(_ context.Context, key string) ([]byte, error) {
-	b, err := os.ReadFile(d.path(key))
+	p, err := d.path(key)
+	if err != nil {
+		return nil, err
+	}
+	b, err := os.ReadFile(p) // #nosec G304 -- p is validated by fs.ValidPath under Root
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, ErrNotFound
 	}

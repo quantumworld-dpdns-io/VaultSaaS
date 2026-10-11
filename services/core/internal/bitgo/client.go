@@ -12,7 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand/v2"
+	"math/rand/v2" // nosemgrep: math-random-used -- retry jitter only, not security-sensitive
 	"net/http"
 	"net/url"
 	"regexp"

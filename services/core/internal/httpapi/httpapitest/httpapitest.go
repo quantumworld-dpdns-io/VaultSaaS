@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	BitGoToken = "tenant-a-bitgo-token"
+	BitGoToken = "tenant-a-bitgo-token" // #nosec G101 -- fake token for the mock BitGo
 	SIWEDomain = "app.vaultops.test"
 )
 

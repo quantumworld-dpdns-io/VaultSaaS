@@ -1,0 +1,5 @@
+# AWS-0095 (SNS topic encryption): CloudWatch alarms cannot publish to a topic
+# encrypted with the AWS-managed aws/sns key, and a customer-managed KMS key
+# costs $1/month (principle 0: no paid AWS services). The topic carries alarm
+# names and states only — no secrets or customer data.
+AWS-0095

@@ -96,3 +96,16 @@ func TestDirListHandlesUncleanRoot(t *testing.T) {
 		t.Fatalf("list with a non-clean root: %v %v", keys, err)
 	}
 }
+
+func TestDirRejectsTraversal(t *testing.T) {
+	d := objects.Dir{Root: t.TempDir()}
+	ctx := context.Background()
+	for _, k := range []string{"../escape.json", "/etc/passwd", "a/../../b"} {
+		if err := d.Put(ctx, k, []byte("x")); err == nil {
+			t.Errorf("key %q must be refused", k)
+		}
+		if _, err := d.Get(ctx, k); err == nil {
+			t.Errorf("key %q must be refused on read", k)
+		}
+	}
+}

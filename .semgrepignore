@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.wrangler/
+test/.venv/
+test/results/
+.tools/
+**/*_test.go
+services/core/internal/bitgo/bitgomock/
+services/core/internal/identity/siwetest/
+services/core/cmd/mockauth/
+services/core/cmd/mockbitgo/
+services/core/cmd/devsign/

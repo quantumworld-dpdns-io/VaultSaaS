@@ -47,3 +47,35 @@ jobs:
         working-directory: apps/edge
       - run: npm ci && npm test && npm run build && npm audit --audit-level=high
         working-directory: apps/web
+
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: semgrep (SAST: Go, TypeScript, Terraform, secrets)
+        env:
+          SEMGREP_SEND_METRICS: "off"
+        run: |
+          pipx install semgrep==1.180.0
+          semgrep scan --config p/golang --config p/typescript --config p/secrets --config p/terraform \
+            --metrics=off --error services apps infra
+
+  terraform-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27"
+          cache: false
+      - name: tflint
+        run: |
+          GOBIN="$RUNNER_TEMP/bin" go install github.com/terraform-linters/tflint@v0.59.1
+          for d in infra/bootstrap infra/envs/dev infra/envs/prod infra/modules/*; do
+            "$RUNNER_TEMP/bin/tflint" --chdir="$d" --minimum-failure-severity=warning
+          done
+      - name: trivy config (IaC misconfiguration)
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/v0.69.3/contrib/install.sh | sh -s -- -b "$RUNNER_TEMP/bin" v0.69.3
+          "$RUNNER_TEMP/bin/trivy" config --exit-code 1 --severity HIGH,CRITICAL --skip-dirs '**/.terraform' \
+            --ignorefile infra/.trivyignore infra

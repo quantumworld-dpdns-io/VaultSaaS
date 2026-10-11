@@ -10,12 +10,10 @@ terraform {
   }
 }
 
-data "aws_region" "current" {}
 
 locals {
   prefix     = "vaultops-${var.env}"
   ssm_prefix = "/vaultops/${var.env}"
-  region     = data.aws_region.current.region
   account_id = var.aws_account_id
 
   functions = {
@@ -135,6 +133,7 @@ resource "aws_iam_role_policy" "fn" {
   policy   = data.aws_iam_policy_document.fn[each.key].json
 }
 
+# nosemgrep: aws-lambda-x-ray-tracing-not-active -- active X-Ray tracing is billed (principle 0); logs + alarms instead
 resource "aws_lambda_function" "fn" {
   for_each      = local.functions
   function_name = "${local.prefix}-${each.key}"
