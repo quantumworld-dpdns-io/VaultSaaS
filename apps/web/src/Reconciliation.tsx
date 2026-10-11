@@ -133,12 +133,15 @@ function ImportCsv() {
         accept=".csv,text/csv"
         data-testid="import-csv"
         onChange={async (e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
+          const input = e.currentTarget;
+          const file = input.files?.[0];
           if (!file) return;
           setMsg(null);
           try {
-            const res = await apiRaw("POST", "/api/v1/expected-payments/import", await file.text(), "text/csv");
+            // Read before clearing the input: clearing it first can leave the read pending.
+            const text = await file.text();
+            input.value = "";
+            const res = await apiRaw("POST", "/api/v1/expected-payments/import", text, "text/csv");
             const r = (await res.json()) as { imported: number; skippedSettled: number };
             setMsg(`Imported ${r.imported} (${r.skippedSettled} already settled).`);
             void qc.invalidateQueries({ queryKey: ["expected"] });
