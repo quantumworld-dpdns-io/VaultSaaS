@@ -285,8 +285,14 @@ user_wallets               (user_id, chain, address, verified_at)  -- SIWE 連�
 - [x] Robot M3 驗收（12/12）+ compliance；M1/M2 套件改為帶身分呼叫（M1–M3 共 51/51）— `1a1093d`
 - **驗收**：跨租戶存取整合測試（BOLA/IDOR 案例）全數被拒；修改 audit_logs 被 trigger 拒絕。✅
 
-### M4 — Reconciliation & Reporting（第 8–10 週，~30h）
-- `recon` 排程、expected_payments CSV 匯入、差異分類、每日報表到 R2。
+### M4 — Reconciliation & Reporting（第 8–10 週，~30h）— 🚧 進行中
+- [x] Schema：expected_payments、reconciliation_runs/items、transfers.receive_address — `e2c3d12`
+- [ ] 對帳引擎（BitGo 回補漏掉的 webhook、狀態修正、預期收款比對）
+- [ ] expected_payments CSV 匯入 API + 對帳 API + `recon` 排程任務
+- [ ] 每日報表 CSV → R2（短效 signed URL；防 CSV injection）
+- [ ] Dashboard：匯入、執行對帳、差異清單、下載報表
+- [ ] Robot M4 驗收 + compliance
+- 差異分類：`matched`、`amount_mismatch`、`missing_bitgo`、`missing_internal`（多出入帳）、`status_mismatch`，另加 `missed_webhook`（BitGo 有、帳本沒有 → 回補）。
 - **驗收**：在 testnet 製造「漏 webhook」「金額不符」「多出入帳」三種情境，皆被正確分類。
 
 ### M5 — Security Alerts & Demo（第 11–12 週，~20h）
