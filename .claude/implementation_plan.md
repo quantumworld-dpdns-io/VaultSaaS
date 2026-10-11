@@ -72,7 +72,7 @@
 | Edge | **Cloudflare Workers Free** | 100k req/日 | — |
 
 > ⚠️ 以上額度為規劃參考，開通前以各官方價格頁為準。AWS 2025 年後的新帳戶 Free Plan 規則需在 Week 0 確認 Always Free 項目是否適用於你的帳戶方案。設定 **AWS Budgets（$1 / $5 警示）**，並記住預算通知 ≠ 硬性停止。
-> ⚠️ Cloudflare → AWS 是跨雲呼叫：Worker 需要一組**只允許 `sqs:SendMessage`（單一 queue）與 `lambda:InvokeFunctionUrl`（單一 function）** 的 IAM user key，存於 Worker secret，每 90 天輪替。這是本架構唯一的長期 AWS 憑證，需列入威脅模型。
+> ⚠️ Cloudflare → AWS 是跨雲呼叫：Worker 需要一組**只允許 `sqs:SendMessage`（單一 queue）與 `lambda:InvokeFunctionUrl` + `lambda:InvokeFunction`（同一個 function；2025 年後 Function URL 需兩者）** 的 IAM user key，存於 Worker secret，每 90 天輪替。這是本架構唯一的長期 AWS 憑證，需列入威脅模型。
 
 ---
 
@@ -157,10 +157,10 @@ terraform {
 **原則 0「AWS 不可使用任何付費服務」的強制機制**
 
 1. **資源類型白名單**（CI 對 `terraform show -json tfplan` 跑 conftest/OPA，不在名單即 fail）：
-   `aws_iam_*`、`aws_lambda_function`、`aws_lambda_function_url`、`aws_lambda_permission`、`aws_lambda_event_source_mapping`、`aws_sqs_queue`、`aws_sqs_queue_redrive_policy`、`aws_scheduler_schedule`、`aws_ssm_parameter`、`aws_cloudwatch_log_group`、`aws_cloudwatch_metric_alarm`、`aws_budgets_budget`。
+   `aws_iam_*`（`aws_iam_access_key` 除外）、`aws_lambda_function`、`aws_lambda_function_url`、`aws_lambda_permission`、`aws_lambda_event_source_mapping`、`aws_sqs_queue`、`aws_sqs_queue_redrive_policy`、`aws_scheduler_schedule`、`aws_ssm_parameter`、`aws_cloudwatch_log_group`、`aws_cloudwatch_metric_alarm`、`aws_sns_topic`／`aws_sns_topic_subscription`（Always Free：1,000 封 email／月，用於告警通知）、`aws_budgets_budget`。
 2. **屬性規則**：
    - `aws_ssm_parameter.tier == "Standard"`（Advanced 收費）；SecureString 不得指定自建 `key_id`（只用 `aws/ssm`）。
-   - `aws_cloudwatch_log_group.retention_in_days` 必填且 ≤ 7；alarm 總數 ≤ 10。
+   - `aws_cloudwatch_log_group.retention_in_days` 必填且 ≤ 7；alarm 每個環境 ≤ 5（dev + prod 共用免費 10 個）。
    - `aws_lambda_function`：`architectures = ["arm64"]`、`memory_size <= 256`、`timeout <= 30`、不啟用 `tracing_config Active`、不掛 VPC（避免 NAT）、不設 provisioned concurrency。
    - `aws_lambda_event_source_mapping.scaling_config.maximum_concurrency = 2`（限制失控；不用 reserved concurrency，因新帳號總配額可能只有 10）。
    - `aws_budgets_budget` 最多 2 個（$0.01「零花費」警示 + $5 上限警示）。
@@ -312,7 +312,7 @@ user_wallets               (user_id, chain, address, verified_at)  -- SIWE 連�
 
 ## 9. 安全基線（DevSecOps）
 
-- IAM 最小權限：每個 Lambda 獨立 role；Worker 的 IAM user 只有兩個 action。
+- IAM 最小權限：每個 Lambda 獨立 role；Worker 的 IAM user 只有三個 action（`lambda:InvokeFunctionUrl`、`lambda:InvokeFunction`、`sqs:SendMessage`），皆限定單一資源。
 - 機密：SSM SecureString（master key）→ 應用層 AES-256-GCM 加密 BitGo tokens，含 `key_version` 以利輪替。
 - Edge：Cloudflare WAF managed rules、rate limiting、`/admin` 以 Cloudflare Access 保護。
 - 應用：所有輸入 schema 驗證（Worker 用 zod、Go 用強型別 struct + 驗證）；輸出不含 token；CSP、HSTS。
