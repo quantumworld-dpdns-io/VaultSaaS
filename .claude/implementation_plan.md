@@ -289,7 +289,7 @@ user_wallets               (user_id, chain, address, verified_at)  -- SIWE 連�
 - [x] Schema：expected_payments、reconciliation_runs/items、transfers.receive_address — `e2c3d12`
 - [x] 對帳引擎（BitGo 回補漏掉的 webhook、狀態修正、預期收款比對）— `24dbdcf`
 - [x] expected_payments CSV 匯入 API + 對帳 API + `recon` 排程任務 — `4ca487c`
-- [ ] 每日報表 CSV → R2（短效 signed URL；防 CSV injection）
+- [x] 每日報表 CSV → R2（短效 signed URL；防 CSV injection）— `a7f37ff`
 - [ ] Dashboard：匯入、執行對帳、差異清單、下載報表
 - [ ] Robot M4 驗收 + compliance
 - 差異分類：`matched`、`amount_mismatch`、`missing_bitgo`、`missing_internal`（多出入帳）、`status_mismatch`，另加 `missed_webhook`（BitGo 有、帳本沒有 → 回補）。
