@@ -59,3 +59,13 @@ variable "siwe_domain" {
   description = "Dashboard host that wallets sign SIWE link messages for."
   type        = string
 }
+
+variable "r2_endpoint" {
+  description = "https://<cloudflare account id>.r2.cloudflarestorage.com"
+  type        = string
+}
+
+variable "r2_audit_bucket" {
+  description = "Name of the audit-anchor R2 bucket (bucket lock enabled)."
+  type        = string
+}

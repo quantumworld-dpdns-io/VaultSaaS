@@ -232,3 +232,13 @@ func (t *Tx) ListLinkedWallets() ([]LinkedWallet, error) {
 		return w, r.Scan(&w.Chain, &w.Address, &w.VerifiedAt)
 	})
 }
+
+// AuditHash returns the stored hash of one audit row in the current org.
+func (t *Tx) AuditHash(id int64) ([]byte, error) {
+	var h []byte
+	err := t.tx.QueryRow(t.ctx, `SELECT hash FROM app.audit_logs WHERE id = $1`, id).Scan(&h)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return h, err
+}

@@ -23,13 +23,15 @@ provider "aws" {
 provider "cloudflare" {}
 
 module "aws_core" {
-  source         = "../../modules/aws-core"
-  env            = local.env
-  aws_account_id = var.aws_account_id
-  siwe_domain    = "app-${local.env}.${var.domain}"
-  bitgo_base_url = "https://app.bitgo-test.com"
-  alert_email    = var.alert_email
-  create_budgets = var.create_budgets
+  source          = "../../modules/aws-core"
+  env             = local.env
+  aws_account_id  = var.aws_account_id
+  r2_endpoint     = "https://${var.cloudflare_account_id}.r2.cloudflarestorage.com"
+  r2_audit_bucket = module.cloudflare_edge.r2_buckets["audit-anchor"]
+  siwe_domain     = "app-${local.env}.${var.domain}"
+  bitgo_base_url  = "https://app.bitgo-test.com"
+  alert_email     = var.alert_email
+  create_budgets  = var.create_budgets
 }
 
 module "aws_edge_access" {

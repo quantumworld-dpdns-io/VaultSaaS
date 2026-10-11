@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/vaultops/core/internal/anchor"
 	"github.com/vaultops/core/internal/bitgo"
 	"github.com/vaultops/core/internal/config"
 	"github.com/vaultops/core/internal/connections"
@@ -26,6 +27,7 @@ type App struct {
 	HTTP   http.Handler
 	Conns  *connections.Resolver // nil without a store
 	Ingest *ingest.Processor     // nil without a store
+	Anchor *anchor.Anchorer      // nil without a store and an object store
 }
 
 func New(ctx context.Context, log *slog.Logger) (*App, error) {
@@ -50,6 +52,18 @@ func New(ctx context.Context, log *slog.Logger) (*App, error) {
 		a.Conns = &connections.Resolver{Store: a.Store, Keyring: kr, BaseURL: cfg.BitGoBaseURL, LocalFallback: a.BitGo}
 		a.Ingest = &ingest.Processor{Store: ingest.PG{S: a.Store}, Log: log,
 			BitGoFor: func(ctx context.Context, org uuid.UUID) (ingest.BitGo, error) { return a.Conns.ForOrg(ctx, org) }}
+	}
+	if a.Store != nil {
+		var objs anchor.ObjectStore
+		switch {
+		case cfg.R2Endpoint != "" && cfg.R2AuditBucket != "":
+			objs = anchor.NewR2(cfg.R2Endpoint, cfg.R2AuditBucket, cfg.R2AccessKeyID, cfg.R2SecretAccessKey)
+		case cfg.AnchorDir != "":
+			objs = anchor.Dir{Root: cfg.AnchorDir}
+		}
+		if objs != nil {
+			a.Anchor = &anchor.Anchorer{Store: a.Store, Objects: objs, Log: log}
+		}
 	}
 	var siwe *identity.SIWE
 	if cfg.SIWEDomain != "" {

@@ -27,6 +27,10 @@ type Config struct {
 	DatabaseURL string // Supavisor transaction pooler URL for role vaultops_app
 	// TokenEncKeys is the keyring for sealing stored BitGo tokens: "1:<b64>,2:<b64>".
 	TokenEncKeys string
+	// Audit anchors: Cloudflare R2 (S3-compatible) bucket with a bucket lock,
+	// or a local directory in development.
+	R2Endpoint, R2AuditBucket, R2AccessKeyID, R2SecretAccessKey string
+	AnchorDir                                                   string
 	// SIWEDomain is the dashboard host[:port] wallets sign for (wallet linking).
 	SIWEDomain string
 	// Local development only: cmd/local polls this queue (ElasticMQ) instead
@@ -66,6 +70,13 @@ func load(ctx context.Context, getenv func(string) string, fetch secretFetcher) 
 	}
 	c.LocalQueueURL = getenv("LOCAL_QUEUE_URL")
 	c.SIWEDomain = getenv("SIWE_DOMAIN")
+	c.R2Endpoint, c.R2AuditBucket, c.AnchorDir = getenv("R2_ENDPOINT"), getenv("R2_AUDIT_BUCKET"), getenv("ANCHOR_DIR")
+	if c.R2AccessKeyID, err = secret(ctx, getenv, fetch, "R2_ACCESS_KEY_ID"); err != nil {
+		return nil, err
+	}
+	if c.R2SecretAccessKey, err = secret(ctx, getenv, fetch, "R2_SECRET_ACCESS_KEY"); err != nil {
+		return nil, err
+	}
 	return c, c.validate()
 }
 
@@ -76,6 +87,9 @@ func (c *Config) validate() error {
 	}
 	if c.BitGoToken != "" && c.Env != "local" {
 		return fmt.Errorf("config: a global BITGO_TOKEN is only allowed locally; organizations use their own connections")
+	}
+	if c.AnchorDir != "" && c.Env != "local" {
+		return fmt.Errorf("config: ANCHOR_DIR is only for VAULTOPS_ENV=local; deployed anchors go to R2")
 	}
 	if c.LocalQueueURL != "" && c.Env != "local" {
 		return fmt.Errorf("config: LOCAL_QUEUE_URL is only for VAULTOPS_ENV=local")
