@@ -22,6 +22,10 @@ type Config struct {
 	Env          string // dev | prod | local
 	BitGoBaseURL string
 	BitGoToken   string
+	DatabaseURL  string // Supavisor transaction pooler URL for role vaultops_app
+	// Local development only: cmd/local polls this queue (ElasticMQ) instead
+	// of receiving SQS events from Lambda.
+	LocalQueueURL string
 }
 
 // BitGo environments. Production is only allowed once the Go/No-Go gates pass.
@@ -48,6 +52,10 @@ func load(ctx context.Context, getenv func(string) string, fetch secretFetcher) 
 		return nil, err
 	}
 	c.BitGoToken = tok
+	if c.DatabaseURL, err = secret(ctx, getenv, fetch, "DATABASE_URL"); err != nil {
+		return nil, err
+	}
+	c.LocalQueueURL = getenv("LOCAL_QUEUE_URL")
 	return c, c.validate()
 }
 
@@ -55,6 +63,9 @@ func (c *Config) validate() error {
 	c.BitGoBaseURL = strings.TrimRight(c.BitGoBaseURL, "/")
 	if c.Env != "prod" && c.BitGoBaseURL == BitGoProdURL {
 		return fmt.Errorf("config: BitGo production URL is only allowed when VAULTOPS_ENV=prod")
+	}
+	if c.LocalQueueURL != "" && c.Env != "local" {
+		return fmt.Errorf("config: LOCAL_QUEUE_URL is only for VAULTOPS_ENV=local")
 	}
 	return nil
 }

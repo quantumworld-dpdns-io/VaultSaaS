@@ -9,6 +9,7 @@ import (
 
 	"github.com/vaultops/core/internal/app"
 	"github.com/vaultops/core/internal/devserver"
+	"github.com/vaultops/core/internal/localsqs"
 )
 
 func main() {
@@ -22,7 +23,14 @@ func main() {
 	if addr == "" {
 		addr = "127.0.0.1:8080"
 	}
-	log.Info("core listening", "addr", addr, "bitgo", a.Config.BitGoBaseURL)
+	if q := a.Config.LocalQueueURL; q != "" {
+		if a.Ingest == nil {
+			log.Error("LOCAL_QUEUE_URL needs DATABASE_URL")
+			os.Exit(1)
+		}
+		go func() { _ = localsqs.Run(context.Background(), q, a.Ingest.HandleSQS, log) }()
+	}
+	log.Info("core listening", "addr", addr, "bitgo", a.Config.BitGoBaseURL, "db", a.Store != nil)
 	if err := devserver.ListenAndServe(addr, a.HTTP); err != nil {
 		log.Error("server stopped", "err", err)
 		os.Exit(1)
