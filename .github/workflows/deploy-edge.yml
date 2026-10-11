@@ -33,9 +33,9 @@ jobs:
         working-directory: apps/edge
         run: |
           if [ "${{ matrix.env }}" = prod ]; then
-            npx wrangler deploy --env prod --var CORE_URL:"${{ vars.CORE_URL }}" --var SQS_QUEUE_URL:"${{ vars.SQS_QUEUE_URL }}"
+            npx wrangler deploy --env prod --var CORE_URL:"${{ vars.CORE_URL }}" --var SQS_QUEUE_URL:"${{ vars.SQS_QUEUE_URL }}" --var SUPABASE_ISSUER:"${{ vars.SUPABASE_URL }}/auth/v1" --var SUPABASE_JWKS_URL:"${{ vars.SUPABASE_URL }}/auth/v1/.well-known/jwks.json"
           else
-            npx wrangler deploy --var ENV:dev --var CORE_URL:"${{ vars.CORE_URL }}" --var SQS_QUEUE_URL:"${{ vars.SQS_QUEUE_URL }}" --var ALLOWED_ORIGINS:"https://app-dev.${{ vars.DOMAIN }}"
+            npx wrangler deploy --var ENV:dev --var CORE_URL:"${{ vars.CORE_URL }}" --var SQS_QUEUE_URL:"${{ vars.SQS_QUEUE_URL }}" --var SUPABASE_ISSUER:"${{ vars.SUPABASE_URL }}/auth/v1" --var SUPABASE_JWKS_URL:"${{ vars.SUPABASE_URL }}/auth/v1/.well-known/jwks.json" --var ALLOWED_ORIGINS:"https://app-dev.${{ vars.DOMAIN }}"
           fi
       - run: npm ci && npm test && npm run build
         working-directory: apps/web

@@ -1,12 +1,13 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
+import { requireUser, identityHeaders, type AuthVars } from "./auth";
 import { callCore } from "./core";
 import type { Env } from "./env";
 import { webhooks } from "./webhooks";
 
-export type AppEnv = { Bindings: Env };
+export type AppEnv = { Bindings: Env; Variables: AuthVars };
 
 export function createApp() {
   const app = new Hono<AppEnv>();
@@ -22,15 +23,19 @@ export function createApp() {
 
   app.route("/webhooks", webhooks);
 
-  // Fail closed: until user authentication exists (M3) the API is only
-  // reachable in local development.
-  app.use("/api/*", async (c, next) => {
-    if (c.env.ENV !== "local") return c.json({ error: "auth_not_configured" }, 503);
-    await next();
-  });
+  app.get("/api/healthz", (c) => proxy(c.env, c.req.raw, "/healthz", {}));
 
-  app.get("/api/healthz", (c) => proxy(c.env, c.req.raw, "/healthz"));
-  app.get("/api/v1/wallets", (c) => proxy(c.env, c.req.raw, "/v1/wallets"));
+  // Everything else under /api/v1 needs a verified Supabase user.
+  app.use("/api/v1/*", requireUser);
+  const forward = async (c: Context<AppEnv>): Promise<Response> => {
+    const extra = identityHeaders(c.get("identity"), c.req.header("x-org-id"));
+    if (!extra) return Response.json({ error: "invalid_org_id" }, { status: 400 });
+    const path = c.req.path.slice("/api".length);
+    return proxy(c.env, c.req.raw, path, extra);
+  };
+  app.get("/api/v1/*", forward);
+  app.post("/api/v1/*", forward);
+  app.put("/api/v1/*", forward);
 
   app.notFound((c) => c.json({ error: "not_found" }, 404));
   app.onError((err, c) => {
@@ -40,12 +45,13 @@ export function createApp() {
   return app;
 }
 
-async function proxy(env: Env, req: Request, path: string): Promise<Response> {
+async function proxy(env: Env, req: Request, path: string, extraHeaders: Record<string, string>): Promise<Response> {
   const url = new URL(req.url);
   const res = await callCore(env, path + url.search, {
     method: req.method,
     headers: req.headers,
     body: req.method === "GET" ? null : await req.arrayBuffer(),
+    extraHeaders,
   });
   // Re-wrap so only safe upstream headers reach the browser.
   return new Response(res.body, {

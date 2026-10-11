@@ -11,6 +11,9 @@ CORE_URL = "http://127.0.0.1:8080"
 SQS_QUEUE_URL = "http://127.0.0.1:9324/000000000000/vaultops-local-webhook-events"
 AWS_REGION = "ap-northeast-1"
 ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+# local: services/core/cmd/mockauth stands in for Supabase Auth
+SUPABASE_ISSUER = "http://127.0.0.1:8095/auth/v1"
+SUPABASE_JWKS_URL = "http://127.0.0.1:8095/auth/v1/.well-known/jwks.json"
 
 # Secrets (wrangler secret put, never in this file):
 #   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY  — IAM user vaultops-<env>-edge
@@ -23,3 +26,5 @@ CORE_URL = "" # Lambda Function URL, from `terraform output core_function_url`
 SQS_QUEUE_URL = "" # from `terraform output webhook_queue_url`
 AWS_REGION = "ap-northeast-1"
 ALLOWED_ORIGINS = "https://app.vaultops.example"
+SUPABASE_ISSUER = "" # https://<project-ref>.supabase.co/auth/v1
+SUPABASE_JWKS_URL = "" # https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json

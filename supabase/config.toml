@@ -1,0 +1,34 @@
+# Supabase project configuration (supabase CLI format).
+# Only the settings VaultOps relies on are listed; everything else stays default.
+project_id = "vaultops"
+
+[api]
+# Core principle 4: the Data API exposes `public` only. Tenant data lives in
+# schema `app`, reachable solely through the Go core service.
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 100
+
+[db]
+major_version = 17
+
+[auth]
+site_url = "https://app.vaultops.example"
+additional_redirect_urls = ["https://app-dev.vaultops.example", "http://127.0.0.1:5173"]
+enable_signup = true
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true   # invitations match on a verified email
+secure_password_change = true
+
+# D4: wallets are linked identities only. Supabase's own Web3 sign-in is OFF
+# so a wallet can never create an account or obtain a session; VaultOps links
+# wallets itself (POST /v1/me/wallets) for already-signed-in users.
+[auth.web3.ethereum]
+enabled = false
+
+[auth.web3.solana]
+enabled = false
