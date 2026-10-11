@@ -43,7 +43,8 @@ func (s *Server) Reset() {
 	defer s.mu.Unlock()
 	s.wallets = []bitgo.Wallet{
 		{ID: "wlt_btc_ops", Coin: "tbtc4", Label: "BTC Operations", Type: "hot", MultisigType: "onchain",
-			BalanceString: "150000000", ConfirmedBalanceString: "150000000", SpendableBalanceString: "150000000", Enterprise: "ent_demo"},
+			BalanceString: "150000000", ConfirmedBalanceString: "150000000", SpendableBalanceString: "150000000", Enterprise: "ent_demo",
+			Admin: json.RawMessage(`{"policy":{"rules":[{"id":"daily-limit","type":"velocityLimit","action":{"type":"getApproval"},"condition":{"amountString":"100000000","timeWindow":86400}}]}}`)},
 		{ID: "wlt_eth_treasury", Coin: "hteth", Label: "ETH Treasury", Type: "custodial", MultisigType: "tss",
 			BalanceString: "2500000000000000000", ConfirmedBalanceString: "2500000000000000000", SpendableBalanceString: "2000000000000000000", Enterprise: "ent_demo"},
 	}
@@ -280,6 +281,26 @@ func (s *Server) control(w http.ResponseWriter, r *http.Request) {
 		s.approvals[a["id"].(string)] = a
 		s.mu.Unlock()
 		writeJSON(w, http.StatusCreated, a)
+	case "/__mock/wallets/policy":
+		var req struct {
+			WalletID string          `json:"walletId"`
+			Policy   json.RawMessage `json:"policy"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		s.mu.Lock()
+		found := false
+		for i := range s.wallets {
+			if s.wallets[i].ID == req.WalletID {
+				s.wallets[i].Admin = json.RawMessage(`{"policy":` + string(req.Policy) + `}`)
+				found = true
+			}
+		}
+		s.mu.Unlock()
+		if !found {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "wallet not found"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "policy updated"})
 	case "/__mock/requests":
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -314,11 +335,20 @@ func (s *Server) AddTransfer(req AddTransferRequest) (bitgo.Transfer, error) {
 	if req.Address == "" {
 		req.Address = "addr_" + req.ID
 	}
+	entries := []bitgo.TransferEntry{{Address: req.Address, ValueString: req.ValueString, Wallet: wl.ID}}
+	if req.Type == "send" {
+		// Our wallet is debited; the destination (req.Address) is credited.
+		abs := strings.TrimPrefix(req.ValueString, "-")
+		entries = []bitgo.TransferEntry{
+			{Address: "change_" + wl.ID, ValueString: "-" + abs, Wallet: wl.ID},
+			{Address: req.Address, ValueString: abs},
+		}
+		req.ValueString = "-" + abs
+	}
 	t := bitgo.Transfer{
 		ID: req.ID, Coin: wl.Coin, Wallet: wl.ID, TxID: fmt.Sprintf("tx%062d", s.seq),
 		Height: 100000 + int64(s.seq), Date: time.Now().UTC().Truncate(time.Second), Confirmations: 6,
-		Type: req.Type, ValueString: req.ValueString, State: req.State,
-		Entries: []bitgo.TransferEntry{{Address: req.Address, ValueString: req.ValueString, Wallet: wl.ID}},
+		Type: req.Type, ValueString: req.ValueString, State: req.State, Entries: entries,
 	}
 	if t.State != "confirmed" {
 		t.Confirmations = 0

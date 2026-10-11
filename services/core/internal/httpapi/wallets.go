@@ -8,6 +8,7 @@ import (
 	"github.com/vaultops/core/internal/authz"
 	"github.com/vaultops/core/internal/bitgo"
 	"github.com/vaultops/core/internal/connections"
+	"github.com/vaultops/core/internal/rules"
 	"github.com/vaultops/core/internal/store"
 )
 
@@ -37,7 +38,11 @@ func (s *Server) listWallets(w http.ResponseWriter, r *http.Request) {
 	var rows []store.WalletRow
 	err = s.store.InOrgAs(r.Context(), sc.Org, sc.UserID, func(tx *store.Tx) error {
 		for _, wl := range fresh {
-			if _, err := tx.UpsertWallet(wl); err != nil {
+			id, err := tx.UpsertWallet(wl)
+			if err != nil {
+				return err
+			}
+			if err := rules.OnWalletSynced(tx, sc.Org, id, wl); err != nil {
 				return err
 			}
 		}

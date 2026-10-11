@@ -2,6 +2,7 @@ package bitgo
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -21,6 +22,8 @@ type Wallet struct {
 	ConfirmedBalanceString string `json:"confirmedBalanceString"`
 	SpendableBalanceString string `json:"spendableBalanceString"`
 	Enterprise             string `json:"enterprise,omitempty"`
+	// Admin carries the wallet policy ({"policy": {...}}); hashed to detect changes.
+	Admin json.RawMessage `json:"admin,omitempty"`
 }
 
 type TransferEntry struct {

@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/vaultops/core/internal/report"
+	"github.com/vaultops/core/internal/rules"
+	"github.com/vaultops/core/internal/store"
 )
 
 // ReconcileAll runs every connected organization; one failing tenant does not
@@ -30,6 +32,17 @@ func (a *App) ReconcileAll(ctx context.Context) (map[string]any, error) {
 			continue
 		}
 		log.Info("reconciled", "org", org, "run", sum.RunID, "stats", sum.Stats)
+	}
+	// Time-based alert rules for every tenant (token expiry, DLQ backlog).
+	all, err := a.Store.AllOrganizations(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, org := range all {
+		if err := a.Store.InOrg(ctx, org, func(tx *store.Tx) error { return rules.Scheduled(tx, org, time.Now()) }); err != nil {
+			failed++
+			log.Error("scheduled rules failed", "org", org, "err", err)
+		}
 	}
 	out := map[string]any{"organizations": len(orgs), "failed": failed}
 	if failed > 0 {

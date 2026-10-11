@@ -165,13 +165,14 @@ type BitGoConnection struct {
 	KeyVersion     int
 	OwnerUserID    uuid.UUID
 	VerifiedAt     time.Time
+	TokenExpiresAt *time.Time
 }
 
 func (t *Tx) BitGoConnection() (*BitGoConnection, error) {
 	var c BitGoConnection
-	err := t.tx.QueryRow(t.ctx, `SELECT environment, enterprise_id, encrypted_token, key_version, owner_user_id, verified_at
-		FROM app.bitgo_connections WHERE organization_id = $1`, t.Org).
-		Scan(&c.Environment, &c.EnterpriseID, &c.EncryptedToken, &c.KeyVersion, &c.OwnerUserID, &c.VerifiedAt)
+	err := t.tx.QueryRow(t.ctx, `SELECT environment, enterprise_id, encrypted_token, key_version, owner_user_id, verified_at,
+		token_expires_at FROM app.bitgo_connections WHERE organization_id = $1`, t.Org).
+		Scan(&c.Environment, &c.EnterpriseID, &c.EncryptedToken, &c.KeyVersion, &c.OwnerUserID, &c.VerifiedAt, &c.TokenExpiresAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -180,13 +181,13 @@ func (t *Tx) BitGoConnection() (*BitGoConnection, error) {
 
 func (t *Tx) PutBitGoConnection(c BitGoConnection) error {
 	_, err := t.tx.Exec(t.ctx, `INSERT INTO app.bitgo_connections
-		(organization_id, environment, enterprise_id, encrypted_token, key_version, owner_user_id, verified_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		(organization_id, environment, enterprise_id, encrypted_token, key_version, owner_user_id, verified_at, token_expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (organization_id) DO UPDATE SET environment = EXCLUDED.environment,
 		  enterprise_id = EXCLUDED.enterprise_id, encrypted_token = EXCLUDED.encrypted_token,
 		  key_version = EXCLUDED.key_version, owner_user_id = EXCLUDED.owner_user_id,
-		  verified_at = EXCLUDED.verified_at, updated_at = now()`,
-		t.Org, c.Environment, c.EnterpriseID, c.EncryptedToken, c.KeyVersion, c.OwnerUserID, c.VerifiedAt)
+		  verified_at = EXCLUDED.verified_at, token_expires_at = EXCLUDED.token_expires_at, updated_at = now()`,
+		t.Org, c.Environment, c.EnterpriseID, c.EncryptedToken, c.KeyVersion, c.OwnerUserID, c.VerifiedAt, c.TokenExpiresAt)
 	return err
 }
 

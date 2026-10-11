@@ -21,6 +21,7 @@ import (
 	"github.com/vaultops/core/internal/bitgo"
 	"github.com/vaultops/core/internal/connections"
 	"github.com/vaultops/core/internal/domain"
+	"github.com/vaultops/core/internal/rules"
 	"github.com/vaultops/core/internal/store"
 )
 
@@ -48,6 +49,7 @@ type event struct {
 
 type OrgTx interface {
 	domain.Ledger
+	rules.Tx
 	RecordWebhookEvent(key string, body []byte, receivedAt time.Time) (store.WebhookEvent, error)
 	MarkWebhookEvent(id uuid.UUID, status, lastError string) error
 	WalletByProviderID(providerWalletID string) (*store.Wallet, error)
@@ -163,14 +165,22 @@ func (p *Processor) Handle(ctx context.Context, m Message, receiveCount int) err
 		walletID := uuid.Nil
 		if known != nil {
 			walletID = known.ID
-		} else if walletID, err = tx.UpsertWallet(*fresh); err != nil {
-			return err
+		} else {
+			if walletID, err = tx.UpsertWallet(*fresh); err != nil {
+				return err
+			}
+			if err := rules.OnWalletSynced(tx, org.ID, walletID, *fresh); err != nil {
+				return err
+			}
 		}
 		obs, err := domain.FromProvider(org.ID, walletID, t)
 		if err != nil {
 			return err
 		}
 		if outcome, err = domain.ApplyObservation(tx, actor, obs); err != nil {
+			return err
+		}
+		if err := rules.OnTransfer(tx, org.ID, obs, outcome); err != nil {
 			return err
 		}
 		status := "processed"

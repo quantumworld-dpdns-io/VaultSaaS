@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/vaultops/core/internal/bitgo"
 	"github.com/vaultops/core/internal/domain"
+	"github.com/vaultops/core/internal/rules"
 	"github.com/vaultops/core/internal/store"
 )
 
@@ -139,6 +140,9 @@ func ledgerPass(tx *store.Tx, org, run uuid.UUID, w bitgo.Wallet, transfers []bi
 	if err != nil {
 		return err
 	}
+	if err := rules.OnWalletSynced(tx, org, walletID, w); err != nil {
+		return err
+	}
 	// Oldest first, so state history is applied in order.
 	sort.SliceStable(transfers, func(i, j int) bool { return transfers[i].Date.Before(transfers[j].Date) })
 	for i := range transfers {
@@ -154,6 +158,9 @@ func ledgerPass(tx *store.Tx, org, run uuid.UUID, w bitgo.Wallet, transfers []bi
 		}
 		outcome, err := domain.ApplyObservation(tx, actor, obs)
 		if err != nil {
+			return err
+		}
+		if err := rules.OnTransfer(tx, org, obs, outcome); err != nil {
 			return err
 		}
 		switch {

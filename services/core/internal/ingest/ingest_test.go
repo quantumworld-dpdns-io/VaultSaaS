@@ -104,6 +104,14 @@ func (f *fakeStore) RaiseAlert(_ uuid.UUID, kind, _, _ string, _ map[string]any,
 	return nil
 }
 
+func (f *fakeStore) AlertSettings() (store.AlertSettings, error) {
+	return store.DefaultAlertSettings(), nil
+}
+func (f *fakeStore) RememberDestination(string, string, uuid.UUID) (bool, error) { return false, nil }
+func (f *fakeStore) RecordWalletPolicy(uuid.UUID, []byte) (bool, error)          { return false, nil }
+func (f *fakeStore) FailedWebhookEventsSince(time.Time) (int, error)             { return 0, nil }
+func (f *fakeStore) BitGoConnection() (*store.BitGoConnection, error)            { return nil, nil }
+
 func setup(t *testing.T) (*Processor, *fakeStore, *bitgomock.Server) {
 	t.Helper()
 	m := bitgomock.New("bg")

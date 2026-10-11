@@ -64,6 +64,7 @@ type Transfer struct {
 	Direction          string
 	Amount             *big.Int // signed base units
 	ReceiveAddress     string   // our address that received funds (receives only)
+	DestinationAddress string   // first external recipient (sends only)
 	State              State
 	ProviderState      string
 	Confirmations      int64
@@ -98,7 +99,8 @@ func FromProvider(org, wallet uuid.UUID, t *bitgo.Transfer) (*Transfer, error) {
 	}
 	return &Transfer{
 		OrganizationID: org, WalletID: wallet, ProviderTransferID: t.ID, Coin: t.Coin, TxID: t.TxID,
-		Direction: dir, Amount: amt, ReceiveAddress: receiveAddress(t, dir), State: st, ProviderState: t.State,
+		Direction: dir, Amount: amt, ReceiveAddress: receiveAddress(t, dir), DestinationAddress: destinationAddress(t, dir),
+		State: st, ProviderState: t.State,
 		Confirmations: t.Confirmations, BlockHeight: height, OccurredAt: occurred,
 	}, nil
 }
@@ -122,6 +124,20 @@ func receiveAddress(t *bitgo.Transfer, dir string) string {
 		}
 	}
 	return NormalizeAddress(fallback)
+}
+
+// destinationAddress picks the first credited entry that is not our wallet.
+func destinationAddress(t *bitgo.Transfer, dir string) string {
+	if dir != "send" {
+		return ""
+	}
+	for _, e := range t.Entries {
+		v, ok := new(big.Int).SetString(e.ValueString, 10)
+		if ok && v.Sign() > 0 && e.Wallet != t.Wallet {
+			return NormalizeAddress(e.Address)
+		}
+	}
+	return ""
 }
 
 // NormalizeAddress lowercases EVM hex addresses (checksum casing is not
@@ -177,6 +193,7 @@ func ApplyObservation(l Ledger, actor string, obs *Transfer) (Outcome, error) {
 		})
 	}
 
+	obs.ID = cur.ID
 	if cur.Amount.Cmp(obs.Amount) != 0 || cur.Direction != obs.Direction || cur.Coin != obs.Coin {
 		// The provider changed an immutable fact; never silently rewrite money.
 		return rejected(l.RaiseAlert(obs.OrganizationID, "transfer_mutated", "high",
