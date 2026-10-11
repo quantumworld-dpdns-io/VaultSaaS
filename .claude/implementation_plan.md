@@ -279,7 +279,7 @@ user_wallets               (user_id, chain, address, verified_at)  -- SIWE 連�
 - [x] 每租戶 BitGo 連線（AES-256-GCM 加密，移除共用 token）— `aa515e3`
 - [x] Go authz（RBAC）+ org API + SIWE 連結錢包（D4：僅連結身分）— `54ce433`
 - [x] Edge 驗證 Supabase JWT（JWKS）並轉送身分；`supabase/config.toml`（Data API 只暴露 `public`、停用 web3 登入）；本機 `mockauth` — `17743db`
-- [ ] 每日 R2 audit 錨點（`recon` Lambda `audit_anchor` 任務 + 排程）
+- [x] 每日 R2 audit 錨點（`recon` Lambda `audit_anchor` 任務 + 排程；可偵測整條鏈重算的竄改）— `eb48b65`
 - [ ] Dashboard 登入、組織切換、連結錢包
 - [ ] Robot M3 驗收 + compliance；M1/M2 套件改為帶身分呼叫
 - **驗收**：跨租戶存取整合測試（BOLA/IDOR 案例）全數被拒；修改 audit_logs 被 trigger 拒絕。（Go 層已通過；Robot 待補）
