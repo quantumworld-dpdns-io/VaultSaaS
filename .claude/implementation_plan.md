@@ -297,7 +297,7 @@ user_wallets               (user_id, chain, address, verified_at)  -- SIWE 連�
 
 ### M5 — Security Alerts & Demo（第 11–12 週，~20h）— 🚧 進行中
 - [x] 告警規則：大額、新目的地址、政策變更、DLQ 堆積、token 即將過期 — `da10c4c`
-- [ ] 告警設定／解除 API 與 Dashboard（門檻、token 到期日）
+- [x] 告警設定／解除 API 與 Dashboard（門檻、token 到期日）— `06dcc35`
 - [ ] SAST（gosec、semgrep）、依賴掃描（govulncheck、npm audit、Dependabot）、Terraform 掃描
 - [ ] threat model（STRIDE）與 runbooks（edge key 輪替、DLQ、備份還原）
 - [ ] 每日 `pg_dump` 加密備份至 R2（GitHub Actions）
