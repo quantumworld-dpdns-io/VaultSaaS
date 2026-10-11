@@ -2,7 +2,7 @@
 # Creates the GitHub Actions OIDC provider and the three CI roles (plan §3.1):
 #   vaultops-tf-plan   read-only, assumable from pull requests
 #   vaultops-tf-apply  scoped write, assumable only from the protected "prod"/"dev" environments
-#   vaultops-deploy    lambda:UpdateFunctionCode only, assumable from main
+#   vaultops-deploy    lambda:UpdateFunctionCode only, assumable from the dev/prod environments
 # Everything here is IAM, which has no charge (principle 0).
 
 terraform {
@@ -60,7 +60,7 @@ data "aws_iam_policy_document" "trust" {
   for_each = {
     plan   = ["${local.repo_sub}:pull_request", "${local.repo_sub}:ref:refs/heads/main"]
     apply  = ["${local.repo_sub}:environment:dev", "${local.repo_sub}:environment:prod"]
-    deploy = ["${local.repo_sub}:ref:refs/heads/main"]
+    deploy = ["${local.repo_sub}:environment:dev", "${local.repo_sub}:environment:prod"]
   }
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]

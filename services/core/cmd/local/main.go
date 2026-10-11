@@ -5,10 +5,10 @@ package main
 import (
 	"context"
 	"log/slog"
-	"net/http"
 	"os"
 
 	"github.com/vaultops/core/internal/app"
+	"github.com/vaultops/core/internal/devserver"
 )
 
 func main() {
@@ -23,7 +23,7 @@ func main() {
 		addr = "127.0.0.1:8080"
 	}
 	log.Info("core listening", "addr", addr, "bitgo", a.Config.BitGoBaseURL)
-	if err := http.ListenAndServe(addr, a.HTTP); err != nil {
+	if err := devserver.ListenAndServe(addr, a.HTTP); err != nil {
 		log.Error("server stopped", "err", err)
 		os.Exit(1)
 	}

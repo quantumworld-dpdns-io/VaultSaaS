@@ -1,0 +1,45 @@
+name: deploy-edge
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/edge/**", "apps/web/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      matrix:
+        env: [dev, prod]
+    environment: ${{ matrix.env }}
+    concurrency: edge-${{ matrix.env }}
+    env:
+      # Cloudflare has no OIDC: scoped token (Workers Scripts + Pages edit), rotated every 90 days.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_DEPLOY }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: npm ci && npm test
+        working-directory: apps/edge
+      - name: deploy worker
+        working-directory: apps/edge
+        run: |
+          if [ "${{ matrix.env }}" = prod ]; then
+            npx wrangler deploy --env prod --var CORE_URL:"${{ vars.CORE_URL }}"
+          else
+            npx wrangler deploy --var ENV:dev --var CORE_URL:"${{ vars.CORE_URL }}" --var ALLOWED_ORIGINS:"https://app-dev.${{ vars.DOMAIN }}"
+          fi
+      - run: npm ci && npm test && npm run build
+        working-directory: apps/web
+        env:
+          VITE_API_BASE: https://${{ matrix.env == 'prod' && 'api' || 'api-dev' }}.${{ vars.DOMAIN }}
+      - name: deploy dashboard
+        run: npx --prefix apps/edge wrangler pages deploy apps/web/dist --project-name "vaultops-${{ matrix.env }}-web" --branch main

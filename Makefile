@@ -5,10 +5,14 @@ TOOLS := $(ROOT)/.tools/bin
 export PATH := $(TOOLS):$(PATH)
 LAMBDAS := $(filter api worker recon,$(notdir $(wildcard $(CORE)/cmd/*)))
 
-.PHONY: deps local-up local-down mock-bitgo core-local edge-dev web-dev \
+.PHONY: tools deps local-up local-down mock-bitgo core-local edge-dev web-dev \
         build-core test test-core test-edge test-web tf-validate policy robot
 
-deps:
+tools:
+	mkdir -p $(TOOLS)
+	GOBIN=$(TOOLS) go install github.com/open-policy-agent/conftest@v0.71.1
+
+deps: tools
 	cd $(CORE) && go mod download
 	cd apps/edge && npm install
 	cd apps/web && npm install

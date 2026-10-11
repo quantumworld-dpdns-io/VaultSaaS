@@ -26,3 +26,4 @@ crash.log
 # robot framework
 test/.venv/
 test/results/
+infra/envs/_policy_*/

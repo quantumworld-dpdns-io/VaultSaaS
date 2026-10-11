@@ -12,7 +12,8 @@ locals {
 }
 
 provider "aws" {
-  region = "ap-northeast-1" # Tokyo: closest region to Taiwan customers (D6)
+  region              = "ap-northeast-1" # Tokyo: closest region to Taiwan customers (D6)
+  allowed_account_ids = [var.aws_account_id]
   default_tags {
     tags = { project = "vaultops", env = local.env, managed_by = "terraform" }
   }
@@ -22,8 +23,9 @@ provider "aws" {
 provider "cloudflare" {}
 
 module "aws_core" {
-  source = "../../modules/aws-core"
-  env    = local.env
+  source         = "../../modules/aws-core"
+  env            = local.env
+  aws_account_id = var.aws_account_id
   # Stays on BitGo testnet until Go/No-Go gate 2 (commercial terms) passes.
   bitgo_base_url = var.bitgo_base_url
   alert_email    = var.alert_email

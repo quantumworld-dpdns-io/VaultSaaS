@@ -11,13 +11,12 @@ terraform {
 }
 
 data "aws_region" "current" {}
-data "aws_caller_identity" "current" {}
 
 locals {
   prefix     = "vaultops-${var.env}"
   ssm_prefix = "/vaultops/${var.env}"
   region     = data.aws_region.current.region
-  account_id = data.aws_caller_identity.current.account_id
+  account_id = var.aws_account_id
 
   functions = {
     api = {

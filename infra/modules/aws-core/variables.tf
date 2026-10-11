@@ -1,3 +1,8 @@
+variable "aws_account_id" {
+  description = "Passed in instead of an STS lookup so plans need no live credentials."
+  type        = string
+}
+
 variable "env" {
   type = string
   validation {

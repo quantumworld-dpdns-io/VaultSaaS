@@ -108,7 +108,7 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 	var wait time.Duration
 	for attempt := 0; attempt <= c.maxRetries; attempt++ {
 		if attempt > 0 {
-			backoff := time.Duration(1<<(attempt-1))*200*time.Millisecond + time.Duration(rand.IntN(100))*time.Millisecond
+			backoff := time.Duration(1<<(attempt-1))*200*time.Millisecond + time.Duration(rand.IntN(100))*time.Millisecond // #nosec G404 -- retry jitter, not security-sensitive
 			if sErr := c.sleep(ctx, max(backoff, wait)); sErr != nil {
 				return sErr
 			}

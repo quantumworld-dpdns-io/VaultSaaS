@@ -341,11 +341,11 @@ func SendWebhook(notifyURL string, t bitgo.Transfer) error {
 	body, _ := json.Marshal(map[string]any{
 		"type": "transfer", "hash": t.TxID, "transfer": t.ID, "coin": t.Coin, "wallet": t.Wallet, "state": t.State,
 	})
-	resp, err := http.Post(notifyURL, "application/json", bytes.NewReader(body))
+	resp, err := http.Post(notifyURL, "application/json", bytes.NewReader(body)) // #nosec G107 -- test double; URL comes from the test harness
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("webhook receiver returned %d", resp.StatusCode)
 	}
