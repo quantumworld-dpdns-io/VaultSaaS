@@ -300,7 +300,7 @@ user_wallets               (user_id, chain, address, verified_at)  -- SIWE 連�
 - [x] 告警設定／解除 API 與 Dashboard（門檻、token 到期日）— `06dcc35`
 - [x] SAST（gosec、semgrep）、依賴掃描（govulncheck、npm audit、Dependabot）、Terraform 掃描（tflint、trivy）— `bf83d8b`
 - [x] threat model（STRIDE）與 runbooks（edge key 輪替、DLQ、備份還原、keyring 輪替）— `fe65892`
-- [ ] 每日 `pg_dump` 加密備份至 R2（GitHub Actions）
+- [x] 每日 `pg_dump` 加密備份至 R2（GitHub Actions，age 加密）— `ff437b8`
 - [ ] README demo 流程；Demo 影片（需人工錄製）
 - [ ] Robot M5 端到端驗收 + compliance
 - **驗收**：完整展示「BitGo testnet 轉帳 → webhook → 入帳 → 對帳 → 報表 → 告警」。
