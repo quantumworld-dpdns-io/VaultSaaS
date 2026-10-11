@@ -20,6 +20,7 @@ import (
 	"github.com/vaultops/core/internal/authz"
 	"github.com/vaultops/core/internal/connections"
 	"github.com/vaultops/core/internal/identity"
+	"github.com/vaultops/core/internal/recon"
 	"github.com/vaultops/core/internal/store"
 )
 
@@ -38,6 +39,7 @@ type Server struct {
 	store *store.Store
 	conns *connections.Resolver
 	siwe  *identity.SIWE
+	recon *recon.Engine
 }
 
 type Deps struct {
@@ -45,13 +47,14 @@ type Deps struct {
 	Store *store.Store
 	Conns *connections.Resolver
 	SIWE  *identity.SIWE
+	Recon *recon.Engine
 }
 
 func New(d Deps) *Server {
 	if d.Log == nil {
 		d.Log = slog.Default()
 	}
-	s := &Server{mux: http.NewServeMux(), log: d.Log, store: d.Store, conns: d.Conns, siwe: d.SIWE}
+	s := &Server{mux: http.NewServeMux(), log: d.Log, store: d.Store, conns: d.Conns, siwe: d.SIWE, recon: d.Recon}
 	s.mux.HandleFunc("GET /healthz", s.healthz)
 
 	user := func(h http.Handler) http.Handler { return s.requireStore(s.requireUser(h)) }
@@ -70,6 +73,11 @@ func New(d Deps) *Server {
 	s.mux.Handle("GET /v1/transfers", org(authz.Viewer, s.listTransfers))
 	s.mux.Handle("GET /v1/alerts", org(authz.Viewer, s.listAlerts))
 	s.mux.Handle("GET /v1/audit", org(authz.Admin, s.listAudit))
+	s.mux.Handle("GET /v1/expected-payments", org(authz.Viewer, s.listExpectedPayments))
+	s.mux.Handle("POST /v1/expected-payments/import", org(authz.Admin, s.importExpectedPayments))
+	s.mux.Handle("POST /v1/reconciliation/runs", org(authz.Admin, s.runReconciliation))
+	s.mux.Handle("GET /v1/reconciliation/runs", org(authz.Viewer, s.listRuns))
+	s.mux.Handle("GET /v1/reconciliation/runs/{id}/items", org(authz.Viewer, s.listRunItems))
 	return s
 }
 

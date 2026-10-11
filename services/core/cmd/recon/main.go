@@ -40,9 +40,38 @@ func run(ctx context.Context, a *app.App, log *slog.Logger, task string) (map[st
 		}
 		log.Info("audit anchors written", "anchored", res.Anchored, "problems", len(res.Problems))
 		return map[string]any{"anchored": res.Anchored, "problems": res.Problems}, nil
-	case "reconcile", "daily_report":
-		log.Info("task not implemented yet (M4)", "task", task)
+	case "reconcile":
+		return reconcileAll(ctx, a, log)
+	case "daily_report":
+		log.Info("task not implemented yet", "task", task)
 		return map[string]any{"skipped": task}, nil
 	}
 	return nil, fmt.Errorf("unknown task %q", task)
+}
+
+// reconcileAll runs every connected organization; one failing tenant does not
+// stop the others, but the invocation errors so the CloudWatch alarm fires.
+func reconcileAll(ctx context.Context, a *app.App, log *slog.Logger) (map[string]any, error) {
+	if a.Recon == nil {
+		return nil, fmt.Errorf("reconcile needs DATABASE_URL")
+	}
+	orgs, err := a.Store.OrganizationsWithBitGo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	failed := 0
+	for _, org := range orgs {
+		sum, err := a.Recon.Run(ctx, org, "schedule")
+		if err != nil {
+			failed++
+			log.Error("reconciliation failed", "org", org, "run", sum.RunID, "err", err)
+			continue
+		}
+		log.Info("reconciled", "org", org, "run", sum.RunID, "stats", sum.Stats)
+	}
+	out := map[string]any{"organizations": len(orgs), "failed": failed}
+	if failed > 0 {
+		return out, fmt.Errorf("%d of %d organizations failed to reconcile", failed, len(orgs))
+	}
+	return out, nil
 }

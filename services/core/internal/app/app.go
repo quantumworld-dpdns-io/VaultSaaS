@@ -16,6 +16,7 @@ import (
 	"github.com/vaultops/core/internal/httpapi"
 	"github.com/vaultops/core/internal/identity"
 	"github.com/vaultops/core/internal/ingest"
+	"github.com/vaultops/core/internal/recon"
 	"github.com/vaultops/core/internal/store"
 )
 
@@ -28,6 +29,7 @@ type App struct {
 	Conns  *connections.Resolver // nil without a store
 	Ingest *ingest.Processor     // nil without a store
 	Anchor *anchor.Anchorer      // nil without a store and an object store
+	Recon  *recon.Engine         // nil without a store
 }
 
 func New(ctx context.Context, log *slog.Logger) (*App, error) {
@@ -54,6 +56,8 @@ func New(ctx context.Context, log *slog.Logger) (*App, error) {
 			BitGoFor: func(ctx context.Context, org uuid.UUID) (ingest.BitGo, error) { return a.Conns.ForOrg(ctx, org) }}
 	}
 	if a.Store != nil {
+		a.Recon = &recon.Engine{Store: a.Store, Log: log, Lookback: cfg.ReconLookback,
+			BitGoFor: func(ctx context.Context, org uuid.UUID) (recon.BitGo, error) { return a.Conns.ForOrg(ctx, org) }}
 		var objs anchor.ObjectStore
 		switch {
 		case cfg.R2Endpoint != "" && cfg.R2AuditBucket != "":
@@ -69,6 +73,6 @@ func New(ctx context.Context, log *slog.Logger) (*App, error) {
 	if cfg.SIWEDomain != "" {
 		siwe = &identity.SIWE{Domain: cfg.SIWEDomain}
 	}
-	a.HTTP = httpapi.New(httpapi.Deps{Log: log, Store: a.Store, Conns: a.Conns, SIWE: siwe})
+	a.HTTP = httpapi.New(httpapi.Deps{Log: log, Store: a.Store, Conns: a.Conns, SIWE: siwe, Recon: a.Recon})
 	return a, nil
 }

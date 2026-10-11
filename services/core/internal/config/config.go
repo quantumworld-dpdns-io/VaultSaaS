@@ -11,8 +11,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -31,6 +33,8 @@ type Config struct {
 	// or a local directory in development.
 	R2Endpoint, R2AuditBucket, R2AccessKeyID, R2SecretAccessKey string
 	AnchorDir                                                   string
+	// ReconLookback is how far back each reconciliation re-reads BitGo.
+	ReconLookback time.Duration
 	// SIWEDomain is the dashboard host[:port] wallets sign for (wallet linking).
 	SIWEDomain string
 	// Local development only: cmd/local polls this queue (ElasticMQ) instead
@@ -70,6 +74,14 @@ func load(ctx context.Context, getenv func(string) string, fetch secretFetcher) 
 	}
 	c.LocalQueueURL = getenv("LOCAL_QUEUE_URL")
 	c.SIWEDomain = getenv("SIWE_DOMAIN")
+	c.ReconLookback = 7 * 24 * time.Hour
+	if h := getenv("RECON_LOOKBACK_HOURS"); h != "" {
+		n, err := strconv.Atoi(h)
+		if err != nil || n < 1 || n > 24*90 {
+			return nil, fmt.Errorf("config: RECON_LOOKBACK_HOURS must be 1..2160")
+		}
+		c.ReconLookback = time.Duration(n) * time.Hour
+	}
 	c.R2Endpoint, c.R2AuditBucket, c.AnchorDir = getenv("R2_ENDPOINT"), getenv("R2_AUDIT_BUCKET"), getenv("ANCHOR_DIR")
 	if c.R2AccessKeyID, err = secret(ctx, getenv, fetch, "R2_ACCESS_KEY_ID"); err != nil {
 		return nil, err

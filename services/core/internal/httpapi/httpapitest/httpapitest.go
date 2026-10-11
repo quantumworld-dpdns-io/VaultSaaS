@@ -3,6 +3,7 @@ package httpapitest
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -16,6 +17,7 @@ import (
 	"github.com/vaultops/core/internal/crypto"
 	"github.com/vaultops/core/internal/httpapi"
 	"github.com/vaultops/core/internal/identity"
+	"github.com/vaultops/core/internal/recon"
 	"github.com/vaultops/core/internal/store"
 	"github.com/vaultops/core/internal/store/storetest"
 )
@@ -49,11 +51,15 @@ func New(t *testing.T) *Env {
 	if err != nil {
 		t.Fatal(err)
 	}
+	conns := &connections.Resolver{Store: s, Keyring: kr, BaseURL: srv.URL}
 	h := httpapi.New(httpapi.Deps{
 		Log:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Store: s,
-		Conns: &connections.Resolver{Store: s, Keyring: kr, BaseURL: srv.URL},
+		Conns: conns,
 		SIWE:  &identity.SIWE{Domain: SIWEDomain},
+		Recon: &recon.Engine{Store: s, BitGoFor: func(ctx context.Context, org uuid.UUID) (recon.BitGo, error) {
+			return conns.ForOrg(ctx, org)
+		}},
 	})
 	return &Env{T: t, Store: s, Owner: owner, BitGo: m, Handler: h}
 }
@@ -103,4 +109,19 @@ func toString(v any) string {
 		return x.String()
 	}
 	return ""
+}
+
+// CallRaw sends a raw body with an explicit content type.
+func (e *Env) CallRaw(u User, org, method, path, contentType, body string) (*httptest.ResponseRecorder, map[string]any) {
+	e.T.Helper()
+	req := httptest.NewRequest(method, path, bytes.NewReader([]byte(body)))
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set(httpapi.HeaderUserID, u.ID.String())
+	req.Header.Set(httpapi.HeaderUserEmail, u.Email)
+	req.Header.Set(httpapi.HeaderOrgID, org)
+	rec := httptest.NewRecorder()
+	e.Handler.ServeHTTP(rec, req)
+	var out map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &out)
+	return rec, out
 }
