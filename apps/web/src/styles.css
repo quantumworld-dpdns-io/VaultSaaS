@@ -36,3 +36,7 @@ code { font-size: 12px; overflow-wrap: anywhere; }
 .alerts li { padding: 8px; border-left: 3px solid var(--line); }
 .sev-high, .sev-critical { border-left-color: #c0392b !important; }
 .sev-medium { border-left-color: #d68910 !important; }
+h3 { font-size: 14px; margin: 16px 0 8px; }
+label.file { display: inline-grid; gap: 4px; }
+.kind-amount_mismatch td:first-child, .kind-missing_bitgo td:first-child { color: #c0392b; }
+.kind-missing_internal td:first-child { color: #d68910; }

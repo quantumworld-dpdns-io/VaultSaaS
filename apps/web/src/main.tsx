@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { accessToken, onAuthChange, signIn, signOut } from "./auth";
 import { api, getMe, setCurrentOrg, type Me } from "./api";
 import { Alerts, Members, Transfers } from "./OrgPanels";
+import { Reconciliation } from "./Reconciliation";
 import { linkInjectedWallet } from "./siwe";
 import { Wallets } from "./Wallets";
 import "./styles.css";
@@ -183,6 +184,10 @@ function OrgView({ canAdmin }: { canAdmin: boolean }) {
       <section>
         <h2>Transfers</h2>
         <Transfers />
+      </section>
+      <section>
+        <h2>Reconciliation</h2>
+        <Reconciliation canAdmin={canAdmin} />
       </section>
       <section>
         <h2>Security alerts</h2>
