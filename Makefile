@@ -49,7 +49,7 @@ test-edge:
 	cd apps/edge && npm test
 
 test-web:
-	cd apps/web && npm run build
+	cd apps/web && npm test && npm run build
 
 tf-validate:
 	./infra/scripts/validate.sh
