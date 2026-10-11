@@ -60,13 +60,13 @@ func nullNum(s string) *string {
 // ---- transfers (domain.Ledger) -------------------------------------------------
 
 const transferCols = `id, organization_id, wallet_id, provider_transfer_id, coin, txid, direction,
-	amount::text, state, provider_state, confirmations, block_height, occurred_at, version`
+	amount::text, receive_address, state, provider_state, confirmations, block_height, occurred_at, version`
 
 func scanTransfer(row pgx.Row) (*domain.Transfer, error) {
 	var tr domain.Transfer
 	var amount, state string
 	err := row.Scan(&tr.ID, &tr.OrganizationID, &tr.WalletID, &tr.ProviderTransferID, &tr.Coin, &tr.TxID, &tr.Direction,
-		&amount, &state, &tr.ProviderState, &tr.Confirmations, &tr.BlockHeight, &tr.OccurredAt, &tr.Version)
+		&amount, &tr.ReceiveAddress, &state, &tr.ProviderState, &tr.Confirmations, &tr.BlockHeight, &tr.OccurredAt, &tr.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -88,11 +88,11 @@ func (t *Tx) InsertTransfer(tr *domain.Transfer) (uuid.UUID, error) {
 	var id uuid.UUID
 	err := t.tx.QueryRow(t.ctx, `
 		INSERT INTO app.transfers (organization_id, wallet_id, provider_transfer_id, coin, txid, direction,
-		                           amount, state, provider_state, confirmations, block_height, occurred_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7::numeric, $8, $9, $10, $11, $12)
+		                           amount, receive_address, state, provider_state, confirmations, block_height, occurred_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7::numeric, $8, $9, $10, $11, $12, $13)
 		RETURNING id`,
 		t.Org, tr.WalletID, tr.ProviderTransferID, tr.Coin, tr.TxID, tr.Direction,
-		tr.Amount.String(), string(tr.State), tr.ProviderState, tr.Confirmations, tr.BlockHeight, tr.OccurredAt,
+		tr.Amount.String(), tr.ReceiveAddress, string(tr.State), tr.ProviderState, tr.Confirmations, tr.BlockHeight, tr.OccurredAt,
 	).Scan(&id)
 	return id, err
 }

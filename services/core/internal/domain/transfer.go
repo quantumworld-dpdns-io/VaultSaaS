@@ -63,6 +63,7 @@ type Transfer struct {
 	TxID               string
 	Direction          string
 	Amount             *big.Int // signed base units
+	ReceiveAddress     string   // our address that received funds (receives only)
 	State              State
 	ProviderState      string
 	Confirmations      int64
@@ -97,9 +98,40 @@ func FromProvider(org, wallet uuid.UUID, t *bitgo.Transfer) (*Transfer, error) {
 	}
 	return &Transfer{
 		OrganizationID: org, WalletID: wallet, ProviderTransferID: t.ID, Coin: t.Coin, TxID: t.TxID,
-		Direction: dir, Amount: amt, State: st, ProviderState: t.State, Confirmations: t.Confirmations,
-		BlockHeight: height, OccurredAt: occurred,
+		Direction: dir, Amount: amt, ReceiveAddress: receiveAddress(t, dir), State: st, ProviderState: t.State,
+		Confirmations: t.Confirmations, BlockHeight: height, OccurredAt: occurred,
 	}, nil
+}
+
+// receiveAddress picks the wallet's own receiving address from the entries.
+func receiveAddress(t *bitgo.Transfer, dir string) string {
+	if dir != "receive" {
+		return ""
+	}
+	var fallback string
+	for _, e := range t.Entries {
+		v, ok := new(big.Int).SetString(e.ValueString, 10)
+		if !ok || v.Sign() <= 0 {
+			continue
+		}
+		if e.Wallet == t.Wallet {
+			return NormalizeAddress(e.Address)
+		}
+		if fallback == "" {
+			fallback = e.Address
+		}
+	}
+	return NormalizeAddress(fallback)
+}
+
+// NormalizeAddress lowercases EVM hex addresses (checksum casing is not
+// significant); other chains' addresses are case-sensitive and kept as is.
+func NormalizeAddress(a string) string {
+	a = strings.TrimSpace(a)
+	if strings.HasPrefix(a, "0x") || strings.HasPrefix(a, "0X") {
+		return strings.ToLower(a)
+	}
+	return a
 }
 
 // Ledger is the storage the domain needs, implemented by store.Tx.
