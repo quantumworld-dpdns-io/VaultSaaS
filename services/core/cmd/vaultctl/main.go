@@ -22,6 +22,8 @@ commands:
   org-create   create an organization and print its webhook token once
   replay       re-send recorded webhook payloads to an edge URL
   audit-anchor verify every audit chain and write anchors (same as the recon task)
+  reconcile    reconcile every connected organization (same as the recon task)
+  daily-report publish yesterday's report for every organization (same as the recon task)
 `)
 	os.Exit(2)
 }
@@ -42,6 +44,8 @@ func main() {
 		err = replay(ctx, os.Args[2:])
 	case "audit-anchor":
 		err = auditAnchor(ctx)
+	case "reconcile", "daily-report":
+		err = job(ctx, os.Args[1])
 	default:
 		usage()
 	}
@@ -113,4 +117,19 @@ func auditAnchor(ctx context.Context) error {
 		return fmt.Errorf("audit integrity problems found")
 	}
 	return nil
+}
+
+func job(ctx context.Context, name string) error {
+	a, err := app.New(ctx, slog.New(slog.NewTextHandler(os.Stderr, nil)))
+	if err != nil {
+		return err
+	}
+	var out map[string]any
+	if name == "reconcile" {
+		out, err = a.ReconcileAll(ctx)
+	} else {
+		out, err = a.PublishDailyReports(ctx)
+	}
+	fmt.Println(out)
+	return err
 }
