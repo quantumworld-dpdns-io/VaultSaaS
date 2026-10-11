@@ -76,7 +76,7 @@ Start Core
     Start Process    ${BIN}/core-local    alias=${alias}    cwd=${ROOT}
     ...    env:CORE_ADDR=127.0.0.1:${port}    env:BITGO_BASE_URL=${MOCK_URL}    env:BITGO_TOKEN=${token}
     ...    env:VAULTOPS_ENV=local    env:DATABASE_URL=${APP_DB_URL}    env:TOKEN_ENC_KEYS=${TOKEN_ENC_KEYS}
-    ...    env:SIWE_DOMAIN=${SIWE_DOMAIN}    &{extra_env}
+    ...    env:SIWE_DOMAIN=${SIWE_DOMAIN}    env:REPORTS_DIR=${RESULTS}/reports    &{extra_env}
     ...    stdout=${RESULTS}/${alias}.log    stderr=STDOUT
     Wait For Http    http://127.0.0.1:${port}/healthz
 
@@ -181,6 +181,13 @@ Api
     ELSE
         ${resp}=    PUT    ${EDGE_URL}${path}    headers=${headers}    json=${body}    expected_status=${expected}
     END
+    RETURN    ${resp}
+
+Api Csv
+    [Documentation]    POSTs a CSV body (text/csv) as a signed-in user.
+    [Arguments]    ${path}    ${token}    ${org}    ${csv}    ${expected}=200
+    ${headers}=    Create Dictionary    Authorization=Bearer ${token}    X-Org-Id=${org}    Content-Type=text/csv
+    ${resp}=    POST    ${EDGE_URL}${path}    headers=${headers}    data=${csv}    expected_status=${expected}
     RETURN    ${resp}
 
 Create Org Via Api

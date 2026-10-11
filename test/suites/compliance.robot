@@ -82,6 +82,22 @@ D5 Only Pending-Approval Decisions May Write To BitGo
     ${out}=    Run And Expect Success    grep -rn "http.MethodPost\\|http.MethodPut\\|http.MethodDelete\\|http.MethodPatch" services/core/internal/bitgo/*.go | grep -v _test.go || true
     Should Not Match Regexp    ${out}    MethodPost|MethodDelete|MethodPatch
 
+P1 Reconciliation Changes The Ledger Only Through The Domain Service
+    [Tags]    p1    m4
+    Run And Expect Success    grep -q "domain.ApplyObservation(tx, actor, obs)" services/core/internal/recon/recon.go
+    No Match In Repo    INSERT INTO app\\.transfers|UPDATE app\\.transfers    services/core/internal/recon services/core/internal/httpapi services/core/internal/report
+
+D5 Reconciliation Uses Only Read-Only BitGo Calls
+    [Tags]    d5    m4
+    ${iface}=    Run And Expect Success    sed -n '/^type BitGo interface/,/^}/p' services/core/internal/recon/recon.go
+    Should Match Regexp    ${iface}    ListWallets
+    Should Match Regexp    ${iface}    ListTransfers
+    Should Not Match Regexp    ${iface}    (?i)send|sign|approve|build|key
+
+P5 Reports Neutralise Spreadsheet Formula Injection
+    [Tags]    p5    m4
+    Run And Expect Success    go test -count=1 ./internal/report/ -run TestSafeCell    cwd=${CORE_DIR}
+
 D6 Infrastructure Lives In Tokyo / APAC
     [Tags]    d6    m1
     ${regions}=    Run And Expect Success    grep -rhoE 'region\\s*=\\s*"[a-z0-9-]+"' infra --include=*.tf | grep -v '"auto"' | sort -u

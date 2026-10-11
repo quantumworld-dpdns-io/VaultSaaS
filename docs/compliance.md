@@ -73,3 +73,31 @@ Manual review:
 - **D5** — no new BitGo write paths. Connecting BitGo is verified with a read-only `ListWallets`.
 - **Tenant isolation fix** — the shared `BITGO_TOKEN` is now refused outside `local`, so each org must use its own connection. Without this, all tenants would have seen the same wallets.
 - **Bug found by the M3 suite:** the local anchor store silently skipped earlier anchors when its root path contained `..` (fixed in `0102e11`; regression test added). R2 itself is unaffected (key listing).
+
+## M4 — Reconciliation & Reporting (2026-10-11)
+
+Result: **M4 suite 9/9; full regression M1 11, M2 10, M3 12, compliance (m1–m4) 21/21 — 63/63.**
+
+Acceptance evidence (one run against mock BitGo):
+
+| Scenario | Classified as |
+|---|---|
+| Transfer at BitGo, webhook never arrived (A, B, X) | `missed_webhook` ×3, backfilled into the ledger |
+| Expected 1000 at addr_a, received 1000 | `matched` (INV-A) |
+| Expected 2000 at addr_b, received 1999 | `amount_mismatch` (INV-B → `mismatched`) |
+| Received 777 at addr_x, nothing expected (extra inbound) | `missing_internal` |
+| Ledger pending, BitGo confirmed (confirmation webhook lost) | `status_mismatch`, corrected to `confirmed`; then `matched` (INV-D) |
+| Expected payment overdue, nothing received | `missing_bitgo` (stays `open`) |
+
+A second (scheduled) run repeats nothing. The daily report contains the day's transfers and findings, with the formula-like reference written as `'=SUM(1+1)`.
+
+Manual review:
+- **P0 / D2** — new infra is env vars only (reports bucket name). Reports go to Cloudflare R2 via presigned URLs, not S3. Policy passes on both environments.
+- **P1** — reconciliation books and corrects transfers only through `domain.ApplyObservation`; no direct writes to `app.transfers` outside the store.
+- **P2** — recon reads BitGo's own transfer list (authoritative), never webhook bodies.
+- **P3** — new tables (`expected_payments`, `reconciliation_runs/items`) have `organization_id` + RLS (covered by `TestEveryTenantTableHasRLS`). A foreign run id returns an empty item list.
+- **P5** — report cells starting with `= + - @` are neutralised (integers excepted). Import accepts integer base units only.
+- **D5** — the recon engine's BitGo interface is `ListWallets` + `ListTransfers` only.
+- **D6** — report day boundaries use Asia/Taipei.
+- **Plan extension:** a sixth finding kind, `missed_webhook`, separates "ledger gap" from the plan's `missing_internal` (unexpected inbound). Recorded in the plan.
+- **Test-environment note:** headless Chrome could not read upload files under `~/Documents` (macOS privacy controls), so the UI test writes its CSV to the system temp dir.
