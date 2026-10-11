@@ -1,0 +1,23 @@
+# Worker code and secrets are deployed with wrangler (plan §3.1); DNS, custom
+# domain, WAF and R2 buckets are owned by Terraform (infra/modules/cloudflare-edge).
+name = "vaultops-edge-dev"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+workers_dev = false
+
+[vars]
+ENV = "local"
+CORE_URL = "http://127.0.0.1:8080"
+AWS_REGION = "ap-northeast-1"
+ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+
+# Secrets (wrangler secret put, never in this file):
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY  — IAM user vaultops-<env>-edge
+
+[env.prod]
+name = "vaultops-edge-prod"
+[env.prod.vars]
+ENV = "prod"
+CORE_URL = "" # Lambda Function URL, from `terraform output core_function_url`
+AWS_REGION = "ap-northeast-1"
+ALLOWED_ORIGINS = "https://app.vaultops.example"

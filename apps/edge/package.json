@@ -1,0 +1,25 @@
+{
+  "name": "@vaultops/edge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --port 8787",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc --noEmit && vitest run"
+  },
+  "dependencies": {
+    "aws4fetch": "1.0.20",
+    "hono": "4.13.13"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261011.1",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3",
+    "wrangler": "4.149.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "workerd@1.20261006.1": true
+  }
+}
