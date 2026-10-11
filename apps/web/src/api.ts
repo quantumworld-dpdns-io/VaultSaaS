@@ -1,15 +1,55 @@
 // All data goes through the edge Worker (core principle 4); the browser never
 // talks to Postgres or holds a service key.
+import { accessToken } from "./auth";
+
 export const API_BASE: string = import.meta.env.VITE_API_BASE ?? "";
 
 export interface Wallet {
   id: string;
+  providerWalletId: string;
   coin: string;
   label: string;
   type: string;
-  balance: string;
-  confirmedBalance: string;
-  spendableBalance: string;
+  balance: string | null;
+  confirmedBalance: string | null;
+  spendableBalance: string | null;
+}
+
+export interface Membership {
+  id: string;
+  name: string;
+  role: "owner" | "admin" | "approver" | "viewer";
+}
+
+export interface Me {
+  userId: string;
+  email: string;
+  organizations: Membership[];
+  linkedWallets: { chain: string; address: string; verifiedAt: string }[];
+}
+
+export interface Transfer {
+  id: string;
+  providerTransferId: string;
+  coin: string;
+  direction: string;
+  amount: string;
+  state: string;
+  occurredAt: string;
+}
+
+export interface Alert {
+  id: string;
+  kind: string;
+  severity: string;
+  message: string;
+  createdAt: string;
+}
+
+export interface Member {
+  userId: string;
+  email: string;
+  role: string;
 }
 
 export class ApiError extends Error {
@@ -18,13 +58,27 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(API_BASE + path, { headers: { accept: "application/json" } });
+let currentOrg: string | null = null;
+export function setCurrentOrg(id: string | null) {
+  currentOrg = id;
+}
+
+export async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = { accept: "application/json" };
+  const token = await accessToken();
+  if (token) headers.authorization = `Bearer ${token}`;
+  if (currentOrg) headers["x-org-id"] = currentOrg;
+  if (body !== undefined) headers["content-type"] = "application/json";
+  const res = await fetch(API_BASE + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new ApiError(res.status, body.error ?? "request_failed");
+    const b = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new ApiError(res.status, b.error ?? "request_failed");
   }
   return (await res.json()) as T;
 }
 
-export const fetchWallets = () => apiGet<{ wallets: Wallet[] }>("/api/v1/wallets").then((r) => r.wallets);
+export const getMe = () => api<Me>("GET", "/api/v1/me");
+export const fetchWallets = () => api<{ wallets: Wallet[]; stale: boolean }>("GET", "/api/v1/wallets");
+export const fetchTransfers = () => api<{ transfers: Transfer[] }>("GET", "/api/v1/transfers").then((r) => r.transfers);
+export const fetchAlerts = () => api<{ alerts: Alert[] }>("GET", "/api/v1/alerts").then((r) => r.alerts);
+export const fetchMembers = () => api<{ members: Member[] }>("GET", "/api/v1/org/members").then((r) => r.members);
