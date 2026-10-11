@@ -5,7 +5,7 @@ TOOLS := $(ROOT)/.tools/bin
 export PATH := $(TOOLS):$(PATH)
 LAMBDAS := $(filter api worker recon,$(notdir $(wildcard $(CORE)/cmd/*)))
 
-.PHONY: tools deps local-up local-down sqs-local migrate-local mock-bitgo core-local edge-dev web-dev \
+.PHONY: tools deps local-up local-down sqs-local migrate-local mock-auth demo mock-bitgo core-local edge-dev web-dev \
         build-core test test-core test-edge test-web tf-validate policy robot
 
 ELASTICMQ_JAR := $(ROOT)/.tools/elasticmq-server-1.7.1.jar
@@ -39,8 +39,16 @@ local-down:
 mock-bitgo:
 	cd $(CORE) && go run ./cmd/mockbitgo
 
+mock-auth:
+	cd $(CORE) && MOCK_AUTH_DB_URL="$(LOCAL_OWNER_DB)" go run ./cmd/mockauth
+
+# Local defaults only (test keyring, local queue, mock BitGo). Never used in AWS.
+LOCAL_APP_DB := postgres://vaultops_app:local-app-password-123@127.0.0.1:54322/vaultops?sslmode=disable
 core-local:
-	cd $(CORE) && go run ./cmd/local
+	cd $(CORE) && VAULTOPS_ENV=local DATABASE_URL="$(LOCAL_APP_DB)" BITGO_BASE_URL=http://127.0.0.1:8090 \
+	  TOKEN_ENC_KEYS=1:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY= SIWE_DOMAIN=127.0.0.1:5173 \
+	  LOCAL_QUEUE_URL=http://127.0.0.1:9324/000000000000/vaultops-local-webhook-events \
+	  ANCHOR_DIR=$(ROOT)/.local/anchors REPORTS_DIR=$(ROOT)/.local/reports go run ./cmd/local
 
 edge-dev:
 	cd apps/edge && npx wrangler dev --local --port 8787
@@ -77,3 +85,7 @@ policy:
 
 robot:
 	./test/run.sh
+
+# End-to-end demo: transfer -> webhook -> booking -> reconciliation -> report -> alerts
+demo:
+	./test/run.sh suites/m5_end_to_end.robot

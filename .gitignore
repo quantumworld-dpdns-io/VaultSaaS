@@ -27,3 +27,4 @@ crash.log
 test/.venv/
 test/results/
 infra/envs/_policy_*/
+.local/
