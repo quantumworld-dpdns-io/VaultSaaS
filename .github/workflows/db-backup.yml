@@ -1,0 +1,51 @@
+name: db-backup
+
+# Supabase Free has no automated backups (plan §4, §10). Daily encrypted
+# pg_dump to the R2 backups bucket (35-day lifecycle). Only ciphertext leaves
+# the runner; the age private key never touches CI. Restore drill:
+# docs/runbooks/backup-restore.md.
+
+on:
+  schedule:
+    - cron: "30 18 * * *" # 02:30 Asia/Taipei
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      matrix:
+        env: [dev, prod]
+    environment: ${{ matrix.env }}
+    concurrency: backup-${{ matrix.env }}
+    steps:
+      - name: install pg_dump 17 and age
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17 age
+      - name: dump, encrypt, upload
+        env:
+          DATABASE_OWNER_URL: ${{ secrets.DATABASE_OWNER_URL }}
+          AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+          # R2 token scoped to the backups bucket (Cloudflare, not AWS S3 — principle 0)
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: https://${{ vars.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        run: |
+          set -euo pipefail
+          test -n "$AGE_RECIPIENT"
+          file="vaultops-${{ matrix.env }}-$(date -u +%Y%m%dT%H%M%SZ).dump.age"
+          /usr/lib/postgresql/17/bin/pg_dump --format=custom --no-owner --schema=app --schema=auth --schema=vaultops_meta \
+            "$DATABASE_OWNER_URL" | age -r "$AGE_RECIPIENT" > "$RUNNER_TEMP/$file"
+          test -s "$RUNNER_TEMP/$file"
+          aws s3 cp --endpoint-url "$R2_ENDPOINT" --only-show-errors "$RUNNER_TEMP/$file" "s3://vaultops-${{ matrix.env }}-backups/$file"
+          rm -f "$RUNNER_TEMP/$file"
+          echo "uploaded $file"

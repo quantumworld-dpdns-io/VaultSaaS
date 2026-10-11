@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: semgrep (SAST: Go, TypeScript, Terraform, secrets)
+      - name: "semgrep (SAST: Go, TypeScript, Terraform, secrets)"
         env:
           SEMGREP_SEND_METRICS: "off"
         run: |
@@ -79,3 +79,13 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/v0.69.3/contrib/install.sh | sh -s -- -b "$RUNNER_TEMP/bin" v0.69.3
           "$RUNNER_TEMP/bin/trivy" config --exit-code 1 --severity HIGH,CRITICAL --skip-dirs '**/.terraform' \
             --ignorefile infra/.trivyignore infra
+
+  workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27"
+          cache: false
+      - run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
