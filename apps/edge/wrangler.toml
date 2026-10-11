@@ -8,6 +8,7 @@ workers_dev = false
 [vars]
 ENV = "local"
 CORE_URL = "http://127.0.0.1:8080"
+SQS_QUEUE_URL = "http://127.0.0.1:9324/000000000000/vaultops-local-webhook-events"
 AWS_REGION = "ap-northeast-1"
 ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
 
@@ -19,5 +20,6 @@ name = "vaultops-edge-prod"
 [env.prod.vars]
 ENV = "prod"
 CORE_URL = "" # Lambda Function URL, from `terraform output core_function_url`
+SQS_QUEUE_URL = "" # from `terraform output webhook_queue_url`
 AWS_REGION = "ap-northeast-1"
 ALLOWED_ORIGINS = "https://app.vaultops.example"

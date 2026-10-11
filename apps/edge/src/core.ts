@@ -42,5 +42,8 @@ export function awsClient(env: Env, service: "lambda" | "sqs"): AwsClient {
     secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
     region: env.AWS_REGION,
     service,
+    // Core calls are not retried (a retried POST could double-apply); SQS
+    // sends may be, because the worker dedupes deliveries.
+    retries: service === "sqs" ? 2 : 0,
   });
 }

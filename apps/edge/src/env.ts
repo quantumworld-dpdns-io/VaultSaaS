@@ -1,6 +1,7 @@
 export interface Env {
   ENV: "local" | "dev" | "prod";
   CORE_URL: string;
+  SQS_QUEUE_URL: string;
   AWS_REGION: string;
   ALLOWED_ORIGINS: string;
   // secrets

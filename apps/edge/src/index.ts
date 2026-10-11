@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { callCore } from "./core";
 import type { Env } from "./env";
+import { webhooks } from "./webhooks";
 
 export type AppEnv = { Bindings: Env };
 
@@ -11,13 +12,15 @@ export function createApp() {
   const app = new Hono<AppEnv>();
 
   app.use("*", secureHeaders());
-  app.use("*", bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: "payload_too_large" }, 413) }));
+  app.use("/api/*", bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: "payload_too_large" }, 413) }));
   app.use("/api/*", async (c, next) => {
     const origins = c.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean);
     return cors({ origin: origins, allowHeaders: ["Authorization", "Content-Type", "X-Org-Id"], maxAge: 600 })(c, next);
   });
 
   app.get("/healthz", (c) => c.json({ status: "ok", service: "edge", env: c.env.ENV }));
+
+  app.route("/webhooks", webhooks);
 
   // Fail closed: until user authentication exists (M3) the API is only
   // reachable in local development.
