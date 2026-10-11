@@ -288,7 +288,7 @@ user_wallets               (user_id, chain, address, verified_at)  -- SIWE 連�
 ### M4 — Reconciliation & Reporting（第 8–10 週，~30h）— 🚧 進行中
 - [x] Schema：expected_payments、reconciliation_runs/items、transfers.receive_address — `e2c3d12`
 - [x] 對帳引擎（BitGo 回補漏掉的 webhook、狀態修正、預期收款比對）— `24dbdcf`
-- [ ] expected_payments CSV 匯入 API + 對帳 API + `recon` 排程任務
+- [x] expected_payments CSV 匯入 API + 對帳 API + `recon` 排程任務 — `4ca487c`
 - [ ] 每日報表 CSV → R2（短效 signed URL；防 CSV injection）
 - [ ] Dashboard：匯入、執行對帳、差異清單、下載報表
 - [ ] Robot M4 驗收 + compliance
