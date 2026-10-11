@@ -274,15 +274,16 @@ user_wallets               (user_id, chain, address, verified_at)  -- SIWE 連�
 - [x] Robot M2 驗收（10/10）+ compliance（M1+M2 共 36/36）— `f5440d4`
 - **驗收**：同一 webhook 重送 10 次只入帳一次；故意讓 BitGo 查詢失敗會進 DLQ 並產生 alert。✅
 
-### M3 — Tenancy, Auth, RBAC, Audit（第 6–7 週，~20h）— 🚧 進行中
+### M3 — Tenancy, Auth, RBAC, Audit（第 6–7 週，~20h）— ✅ 完成
 - [x] 成員、邀請、所有 `app` 表 RLS、audit hash chain + append-only trigger — `4f789ac`
 - [x] 每租戶 BitGo 連線（AES-256-GCM 加密，移除共用 token）— `aa515e3`
 - [x] Go authz（RBAC）+ org API + SIWE 連結錢包（D4：僅連結身分）— `54ce433`
 - [x] Edge 驗證 Supabase JWT（JWKS）並轉送身分；`supabase/config.toml`（Data API 只暴露 `public`、停用 web3 登入）；本機 `mockauth` — `17743db`
 - [x] 每日 R2 audit 錨點（`recon` Lambda `audit_anchor` 任務 + 排程；可偵測整條鏈重算的竄改）— `eb48b65`
 - [x] Dashboard 登入（Supabase email OTP／本機 mockauth）、組織建立與切換、BitGo 連線、成員邀請、轉帳與告警、連結錢包 — `f04aa8f`
-- [ ] Robot M3 驗收 + compliance；M1/M2 套件改為帶身分呼叫
-- **驗收**：跨租戶存取整合測試（BOLA/IDOR 案例）全數被拒；修改 audit_logs 被 trigger 拒絕。（Go 層已通過；Robot 待補）
+- [x] 修正：本機 anchor 目錄在含 `..` 的路徑下找不到舊錨點 — `0102e11`
+- [x] Robot M3 驗收（12/12）+ compliance；M1/M2 套件改為帶身分呼叫（M1–M3 共 51/51）— `1a1093d`
+- **驗收**：跨租戶存取整合測試（BOLA/IDOR 案例）全數被拒；修改 audit_logs 被 trigger 拒絕。✅
 
 ### M4 — Reconciliation & Reporting（第 8–10 週，~30h）
 - `recon` 排程、expected_payments CSV 匯入、差異分類、每日報表到 R2。
