@@ -7,12 +7,14 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/vaultops/core/internal/bitgo"
 	"github.com/vaultops/core/internal/config"
 	"github.com/vaultops/core/internal/httpapi"
 )
 
 type App struct {
 	Config *config.Config
+	BitGo  *bitgo.Client
 	HTTP   http.Handler
 }
 
@@ -21,8 +23,10 @@ func New(ctx context.Context, log *slog.Logger) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	bg := bitgo.New(cfg.BitGoBaseURL, cfg.BitGoToken)
 	return &App{
 		Config: cfg,
-		HTTP:   httpapi.New(httpapi.Deps{Log: log}),
+		BitGo:  bg,
+		HTTP:   httpapi.New(httpapi.Deps{Log: log, Wallets: bg}),
 	}, nil
 }

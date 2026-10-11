@@ -13,20 +13,23 @@ import (
 var Version = "dev"
 
 type Server struct {
-	mux *http.ServeMux
-	log *slog.Logger
+	mux     *http.ServeMux
+	log     *slog.Logger
+	wallets WalletSource
 }
 
 type Deps struct {
-	Log *slog.Logger
+	Log     *slog.Logger
+	Wallets WalletSource
 }
 
 func New(d Deps) *Server {
 	if d.Log == nil {
 		d.Log = slog.Default()
 	}
-	s := &Server{mux: http.NewServeMux(), log: d.Log}
+	s := &Server{mux: http.NewServeMux(), log: d.Log, wallets: d.Wallets}
 	s.mux.HandleFunc("GET /healthz", s.healthz)
+	s.mux.HandleFunc("GET /v1/wallets", s.listWallets)
 	return s
 }
 
